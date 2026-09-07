@@ -10,6 +10,16 @@ enum InspectionStatus: String, CaseIterable, Identifiable, Codable {
     var id: String { rawValue }
 }
 
+enum InspectionWorkflowStatus: String, CaseIterable, Identifiable, Codable {
+    case draft = "Utkast"
+    case completedByTechnician = "Ferdig fra tekniker"
+    case readyForOffice = "Klar for kontor"
+    case processedByOffice = "Behandlet av kontor"
+    case invoiced = "Fakturert"
+
+    var id: String { rawValue }
+}
+
 enum ChecklistResult: String, CaseIterable, Identifiable, Codable {
     case ok = "OK"
     case remark = "Mangel"
@@ -189,6 +199,10 @@ enum InspectionTemplates {
 @Model
 final class Inspection {
     var createdAt: Date
+    var updatedAt: Date
+    var completedAt: Date?
+    var processedAt: Date?
+    var invoicedAt: Date?
     var certificateNumber: String
     var companyOwner: String
     var contactPerson: String
@@ -204,12 +218,17 @@ final class Inspection {
     @Attribute(.externalStorage) var customerSignatureData: Data
     @Attribute(.externalStorage) var inspectorSignatureData: Data
     var statusRawValue: String
+    var workflowStatusRawValue: String
 
     @Relationship(deleteRule: .cascade, inverse: \Machine.inspection)
     var machines: [Machine]
 
     init(
         createdAt: Date = .now,
+        updatedAt: Date = .now,
+        completedAt: Date? = nil,
+        processedAt: Date? = nil,
+        invoicedAt: Date? = nil,
         certificateNumber: String = "",
         companyOwner: String = "",
         contactPerson: String = "",
@@ -224,9 +243,14 @@ final class Inspection {
         attachmentsCount: String = "",
         customerSignatureData: Data = Data(),
         inspectorSignatureData: Data = Data(),
-        status: InspectionStatus = .approved
+        status: InspectionStatus = .approved,
+        workflowStatus: InspectionWorkflowStatus = .draft
     ) {
         self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.completedAt = completedAt
+        self.processedAt = processedAt
+        self.invoicedAt = invoicedAt
         self.certificateNumber = certificateNumber
         self.companyOwner = companyOwner
         self.contactPerson = contactPerson
@@ -242,12 +266,38 @@ final class Inspection {
         self.customerSignatureData = customerSignatureData
         self.inspectorSignatureData = inspectorSignatureData
         self.statusRawValue = status.rawValue
+        self.workflowStatusRawValue = workflowStatus.rawValue
         self.machines = []
     }
 
     var status: InspectionStatus {
         get { InspectionStatus(rawValue: statusRawValue) ?? .approved }
-        set { statusRawValue = newValue.rawValue }
+        set {
+            statusRawValue = newValue.rawValue
+            updatedAt = .now
+        }
+    }
+
+    var workflowStatus: InspectionWorkflowStatus {
+        get { InspectionWorkflowStatus(rawValue: workflowStatusRawValue) ?? .draft }
+        set {
+            workflowStatusRawValue = newValue.rawValue
+            updatedAt = .now
+
+            switch newValue {
+            case .draft:
+                break
+            case .completedByTechnician, .readyForOffice:
+                completedAt = completedAt ?? .now
+            case .processedByOffice:
+                completedAt = completedAt ?? .now
+                processedAt = processedAt ?? .now
+            case .invoiced:
+                completedAt = completedAt ?? .now
+                processedAt = processedAt ?? .now
+                invoicedAt = invoicedAt ?? .now
+            }
+        }
     }
 
     var customerSignatureDrawing: PKDrawing {

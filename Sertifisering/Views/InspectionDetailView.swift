@@ -6,6 +6,7 @@ struct InspectionDetailView: View {
     @Bindable var inspection: Inspection
     @State private var exportedPDFURL: URL?
     @State private var exportErrorMessage: String?
+    @State private var completionErrorMessage: String?
 
     var body: some View {
         Form {
@@ -20,10 +21,43 @@ struct InspectionDetailView: View {
                 TextField("Sted", text: $inspection.location)
                 TextField("Kontroll utført av", text: $inspection.inspector)
                 TextField("Antall vedlegg", text: $inspection.attachmentsCount)
-                Picker("Status", selection: $inspection.status) {
+                Picker("Kontrollresultat", selection: $inspection.status) {
                     ForEach(InspectionStatus.allCases) { status in
                         Text(status.rawValue).tag(status)
                     }
+                }
+            }
+
+            Section("Arbeidsflyt") {
+                Picker("Arbeidsstatus", selection: $inspection.workflowStatus) {
+                    ForEach(InspectionWorkflowStatus.allCases) { status in
+                        Text(status.rawValue).tag(status)
+                    }
+                }
+
+                Button("Marker ferdig fra tekniker", systemImage: "checkmark.seal", action: completeTechnicianInspection)
+                    .disabled(!canCompleteTechnicianInspection || inspection.workflowStatus != .draft)
+
+                if !canCompleteTechnicianInspection && inspection.workflowStatus == .draft {
+                    Text("Fyll ut firma/eier, kontrollør og legg til minst én maskin før kontrollen fullføres.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if inspection.workflowStatus != .draft {
+                    Button("Tilbakestill til utkast", systemImage: "arrow.uturn.backward", role: .destructive, action: resetToDraft)
+                }
+
+                if let completedAt = inspection.completedAt {
+                    LabeledContent("Fullført", value: completedAt.formatted(date: .abbreviated, time: .shortened))
+                }
+
+                if let processedAt = inspection.processedAt {
+                    LabeledContent("Behandlet", value: processedAt.formatted(date: .abbreviated, time: .shortened))
+                }
+
+                if let invoicedAt = inspection.invoicedAt {
+                    LabeledContent("Fakturert", value: invoicedAt.formatted(date: .abbreviated, time: .shortened))
                 }
             }
 
@@ -79,6 +113,11 @@ struct InspectionDetailView: View {
         } message: {
             Text(exportErrorMessage ?? "Ukjent feil")
         }
+        .alert("Kontrollen kan ikke fullføres", isPresented: completionAlertIsPresented) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(completionErrorMessage ?? "Ukjent feil")
+        }
     }
 
     private func addMachine() {
@@ -92,6 +131,38 @@ struct InspectionDetailView: View {
         for index in offsets {
             modelContext.delete(inspection.machines[index])
         }
+    }
+
+    private func completeTechnicianInspection() {
+        guard canCompleteTechnicianInspection else {
+            completionErrorMessage = "Fyll ut firma/eier, kontrollør og legg til minst én maskin før kontrollen fullføres."
+            return
+        }
+
+        inspection.workflowStatus = .completedByTechnician
+        saveChanges()
+    }
+
+    private func resetToDraft() {
+        inspection.workflowStatus = .draft
+        inspection.completedAt = nil
+        inspection.processedAt = nil
+        inspection.invoicedAt = nil
+        saveChanges()
+    }
+
+    private func saveChanges() {
+        do {
+            try modelContext.save()
+        } catch {
+            completionErrorMessage = error.localizedDescription
+        }
+    }
+
+    private var canCompleteTechnicianInspection: Bool {
+        !inspection.companyOwner.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !inspection.inspector.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !inspection.machines.isEmpty
     }
 
     private func exportPDF() {
@@ -109,6 +180,17 @@ struct InspectionDetailView: View {
             set: { isPresented in
                 if !isPresented {
                     exportErrorMessage = nil
+                }
+            }
+        )
+    }
+
+    private var completionAlertIsPresented: Binding<Bool> {
+        Binding(
+            get: { completionErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    completionErrorMessage = nil
                 }
             }
         )

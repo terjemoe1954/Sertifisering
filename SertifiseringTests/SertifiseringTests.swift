@@ -32,4 +32,15 @@ struct SertifiseringTests {
         #expect(inspection.status == .approvedWithRemarks)
         #expect(inspection.statusRawValue == "Godkjent med mangel")
     }
+
+    @Test func workflowStatusRoundtripUsesStoredRawValueAndDates() async throws {
+        let inspection = Inspection(workflowStatus: .draft)
+
+        inspection.workflowStatus = .readyForOffice
+
+        #expect(inspection.workflowStatus == .readyForOffice)
+        #expect(inspection.workflowStatusRawValue == "Klar for kontor")
+        #expect(inspection.completedAt != nil)
+        #expect(inspection.updatedAt >= inspection.createdAt)
+    }
 }
