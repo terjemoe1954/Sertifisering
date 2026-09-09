@@ -198,25 +198,26 @@ enum InspectionTemplates {
 
 @Model
 final class Inspection {
+    var id: UUID
     var createdAt: Date
     var updatedAt: Date
     var completedAt: Date?
     var processedAt: Date?
     var invoicedAt: Date?
-    var certificateNumber: String
-    var companyOwner: String
-    var contactPerson: String
-    var phone: String
-    var address: String
-    var inspector: String
-    var location: String
-    var projectNumber: String
-    var overallNotes: String
-    var signatureCustomerName: String
-    var signatureInspectorName: String
-    var attachmentsCount: String
-    @Attribute(.externalStorage) var customerSignatureData: Data
-    @Attribute(.externalStorage) var inspectorSignatureData: Data
+    var certificateNumber: String { didSet { touch() } }
+    var companyOwner: String { didSet { touch() } }
+    var contactPerson: String { didSet { touch() } }
+    var phone: String { didSet { touch() } }
+    var address: String { didSet { touch() } }
+    var inspector: String { didSet { touch() } }
+    var location: String { didSet { touch() } }
+    var projectNumber: String { didSet { touch() } }
+    var overallNotes: String { didSet { touch() } }
+    var signatureCustomerName: String { didSet { touch() } }
+    var signatureInspectorName: String { didSet { touch() } }
+    var attachmentsCount: String { didSet { touch() } }
+    @Attribute(.externalStorage) var customerSignatureData: Data { didSet { touch() } }
+    @Attribute(.externalStorage) var inspectorSignatureData: Data { didSet { touch() } }
     var statusRawValue: String
     var workflowStatusRawValue: String
 
@@ -224,6 +225,7 @@ final class Inspection {
     var machines: [Machine]
 
     init(
+        id: UUID = UUID(),
         createdAt: Date = .now,
         updatedAt: Date = .now,
         completedAt: Date? = nil,
@@ -246,6 +248,7 @@ final class Inspection {
         status: InspectionStatus = .approved,
         workflowStatus: InspectionWorkflowStatus = .draft
     ) {
+        self.id = id
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.completedAt = completedAt
@@ -313,26 +316,29 @@ final class Inspection {
 
 @Model
 final class Machine {
-    var name: String
+    var id: UUID
+    var createdAt: Date
+    var updatedAt: Date
+    var name: String { didSet { touch() } }
     var categoryRawValue: String
-    var machineType: String
-    var serialNumber: String
-    var annualControl: Bool
-    var fullService: Bool
-    var manufacturer: String
-    var hoistType: String
-    var craneNumber: String
-    var hoistNumber: String
-    var internalLocation: String
-    var hourMeter: String
-    var loadIndicator: String
-    var certificateNumber: String
-    var notes: String
-    var looseObjectsFound: Bool
-    var looseObjectsRemoved: Bool
-    var remainingLifetimeDocumented: Bool
-    var remainingLifetimeSWP: String
-    var usageCertificateValid: Bool
+    var machineType: String { didSet { touch() } }
+    var serialNumber: String { didSet { touch() } }
+    var annualControl: Bool { didSet { touch() } }
+    var fullService: Bool { didSet { touch() } }
+    var manufacturer: String { didSet { touch() } }
+    var hoistType: String { didSet { touch() } }
+    var craneNumber: String { didSet { touch() } }
+    var hoistNumber: String { didSet { touch() } }
+    var internalLocation: String { didSet { touch() } }
+    var hourMeter: String { didSet { touch() } }
+    var loadIndicator: String { didSet { touch() } }
+    var certificateNumber: String { didSet { touch() } }
+    var notes: String { didSet { touch() } }
+    var looseObjectsFound: Bool { didSet { touch() } }
+    var looseObjectsRemoved: Bool { didSet { touch() } }
+    var remainingLifetimeDocumented: Bool { didSet { touch() } }
+    var remainingLifetimeSWP: String { didSet { touch() } }
+    var usageCertificateValid: Bool { didSet { touch() } }
 
     var inspection: Inspection?
 
@@ -340,6 +346,9 @@ final class Machine {
     var checklistItems: [MachineChecklistItem]
 
     init(
+        id: UUID = UUID(),
+        createdAt: Date = .now,
+        updatedAt: Date = .now,
         name: String = "",
         category: MachineCategory = .crane,
         machineType: String = "Kran",
@@ -361,6 +370,9 @@ final class Machine {
         remainingLifetimeSWP: String = "",
         usageCertificateValid: Bool = true
     ) {
+        self.id = id
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
         self.name = name
         self.categoryRawValue = category.rawValue
         self.machineType = machineType
@@ -386,23 +398,35 @@ final class Machine {
 
     var category: MachineCategory {
         get { MachineCategory(rawValue: categoryRawValue) ?? .crane }
-        set { categoryRawValue = newValue.rawValue }
+        set {
+            categoryRawValue = newValue.rawValue
+            touch()
+        }
+    }
+
+    private func touch() {
+        updatedAt = .now
+        inspection?.updatedAt = .now
     }
 }
 
 @Model
 final class MachineChecklistItem {
+    var id: UUID
+    var updatedAt: Date
     var sectionOrder: Int
     var sectionTitle: String
     var itemOrder: Int
     var code: String
     var title: String
     var resultRawValue: String
-    var note: String
+    var note: String { didSet { touch() } }
 
     var machine: Machine?
 
     init(
+        id: UUID = UUID(),
+        updatedAt: Date = .now,
         sectionOrder: Int,
         sectionTitle: String,
         itemOrder: Int,
@@ -411,6 +435,8 @@ final class MachineChecklistItem {
         result: ChecklistResult = .ok,
         note: String = ""
     ) {
+        self.id = id
+        self.updatedAt = updatedAt
         self.sectionOrder = sectionOrder
         self.sectionTitle = sectionTitle
         self.itemOrder = itemOrder
@@ -422,7 +448,16 @@ final class MachineChecklistItem {
 
     var result: ChecklistResult {
         get { ChecklistResult(rawValue: resultRawValue) ?? .ok }
-        set { resultRawValue = newValue.rawValue }
+        set {
+            resultRawValue = newValue.rawValue
+            touch()
+        }
+    }
+
+    private func touch() {
+        updatedAt = .now
+        machine?.updatedAt = .now
+        machine?.inspection?.updatedAt = .now
     }
 }
 

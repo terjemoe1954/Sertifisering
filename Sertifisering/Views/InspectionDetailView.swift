@@ -38,6 +38,12 @@ struct InspectionDetailView: View {
                 Button("Marker ferdig fra tekniker", systemImage: "checkmark.seal", action: completeTechnicianInspection)
                     .disabled(!canCompleteTechnicianInspection || inspection.workflowStatus != .draft)
 
+                Button("Marker behandlet av kontor", systemImage: "tray.full", action: processOfficeInspection)
+                    .disabled(!canProcessOfficeInspection)
+
+                Button("Marker fakturert", systemImage: "checkmark.circle", action: markInspectionInvoiced)
+                    .disabled(!canMarkInspectionInvoiced)
+
                 if !canCompleteTechnicianInspection && inspection.workflowStatus == .draft {
                     Text("Fyll ut firma/eier, kontrollør og legg til minst én maskin før kontrollen fullføres.")
                         .font(.caption)
@@ -143,6 +149,26 @@ struct InspectionDetailView: View {
         saveChanges()
     }
 
+    private func processOfficeInspection() {
+        guard canProcessOfficeInspection else {
+            completionErrorMessage = "Kontrollen må være ferdig fra tekniker før kontoret kan behandle den."
+            return
+        }
+
+        inspection.workflowStatus = .processedByOffice
+        saveChanges()
+    }
+
+    private func markInspectionInvoiced() {
+        guard canMarkInspectionInvoiced else {
+            completionErrorMessage = "Kontrollen må være behandlet av kontor før den kan markeres som fakturert."
+            return
+        }
+
+        inspection.workflowStatus = .invoiced
+        saveChanges()
+    }
+
     private func resetToDraft() {
         inspection.workflowStatus = .draft
         inspection.completedAt = nil
@@ -163,6 +189,14 @@ struct InspectionDetailView: View {
         !inspection.companyOwner.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !inspection.inspector.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !inspection.machines.isEmpty
+    }
+
+    private var canProcessOfficeInspection: Bool {
+        inspection.workflowStatus == .completedByTechnician || inspection.workflowStatus == .readyForOffice
+    }
+
+    private var canMarkInspectionInvoiced: Bool {
+        inspection.workflowStatus == .processedByOffice
     }
 
     private func exportPDF() {

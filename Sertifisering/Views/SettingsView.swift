@@ -1,5 +1,24 @@
 import SwiftUI
 
+enum AppUserRole: String, CaseIterable, Identifiable {
+    case technician
+    case office
+    case admin
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .technician:
+            return "Tekniker"
+        case .office:
+            return "Kontor"
+        case .admin:
+            return "Admin"
+        }
+    }
+}
+
 enum AppAppearance: String, CaseIterable, Identifiable {
     case system
     case light
@@ -33,6 +52,7 @@ enum AppAppearance: String, CaseIterable, Identifiable {
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("app.appearance.mode") private var appearanceModeRawValue = AppAppearance.system.rawValue
+    @AppStorage("app.user.role") private var userRoleRawValue = AppUserRole.technician.rawValue
     @State private var backups: [PersistenceController.BackupSnapshot] = []
     @State private var backupMessage: String?
     @State private var restoreMessage: String?
@@ -46,9 +66,25 @@ struct SettingsView: View {
         )
     }
 
+    private var userRole: Binding<AppUserRole> {
+        Binding(
+            get: { AppUserRole(rawValue: userRoleRawValue) ?? .technician },
+            set: { userRoleRawValue = $0.rawValue }
+        )
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                Section("Brukerrolle") {
+                    Picker("Rolle", selection: userRole) {
+                        ForEach(AppUserRole.allCases) { role in
+                            Text(role.title).tag(role)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
                 Section("Utseende") {
                     Picker("Modus", selection: appearanceMode) {
                         ForEach(AppAppearance.allCases) { mode in

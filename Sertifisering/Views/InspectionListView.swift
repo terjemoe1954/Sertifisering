@@ -11,6 +11,7 @@ import SwiftData
 struct InspectionListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Inspection.createdAt, order: .reverse) private var inspections: [Inspection]
+    @AppStorage("app.user.role") private var userRoleRawValue = AppUserRole.technician.rawValue
     @State private var isShowingSettings = false
     @State private var selectedFilter: InspectionListFilter = .all
 
@@ -20,9 +21,95 @@ struct InspectionListView: View {
         }
     }
 
+    private var currentRole: AppUserRole {
+        AppUserRole(rawValue: userRoleRawValue) ?? .technician
+    }
+
+    private var showsOfficeSummary: Bool {
+        currentRole == .office || currentRole == .admin
+    }
+
+    private var draftCount: Int {
+        inspections.filter { InspectionListFilter.draft.includes($0) }.count
+    }
+
+    private var completedByTechnicianCount: Int {
+        inspections.filter { $0.workflowStatus == .completedByTechnician }.count
+    }
+
+    private var readyForOfficeCount: Int {
+        inspections.filter { InspectionListFilter.readyForOffice.includes($0) }.count
+    }
+
+    private var processedCount: Int {
+        inspections.filter { InspectionListFilter.processedByOffice.includes($0) }.count
+    }
+
+    private var notInvoicedCount: Int {
+        inspections.filter { $0.workflowStatus != .draft && $0.workflowStatus != .invoiced }.count
+    }
+
     var body: some View {
         NavigationStack {
             List {
+                if !inspections.isEmpty && !showsOfficeSummary {
+                    Section("Tekniker") {
+                        Button {
+                            selectedFilter = .draft
+                        } label: {
+                            OfficeSummaryRow(
+                                title: "Utkast",
+                                value: draftCount,
+                                systemImage: "square.and.pencil"
+                            )
+                        }
+
+                        Button {
+                            selectedFilter = .readyForOffice
+                        } label: {
+                            OfficeSummaryRow(
+                                title: "Ferdig fra tekniker",
+                                value: completedByTechnicianCount,
+                                systemImage: "checkmark.seal"
+                            )
+                        }
+                    }
+                }
+
+                if !inspections.isEmpty && showsOfficeSummary {
+                    Section("Kontor") {
+                        Button {
+                            selectedFilter = .readyForOffice
+                        } label: {
+                            OfficeSummaryRow(
+                                title: "Klar for behandling",
+                                value: readyForOfficeCount,
+                                systemImage: "tray.full"
+                            )
+                        }
+
+                        Button {
+                            selectedFilter = .processedByOffice
+                        } label: {
+                            OfficeSummaryRow(
+                                title: "Behandlet",
+                                value: processedCount,
+                                systemImage: "checkmark.seal"
+                            )
+                        }
+
+                        Button {
+                            selectedFilter = .notInvoiced
+                        } label: {
+                            OfficeSummaryRow(
+                                title: "Ikke fakturert",
+                                value: notInvoicedCount,
+                                systemImage: "doc.plaintext"
+                            )
+                        }
+                    }
+                }
+
                 if inspections.isEmpty {
                     ContentUnavailableView(
                         "Ingen kontroller ennå",
@@ -91,6 +178,7 @@ private enum InspectionListFilter: String, CaseIterable, Identifiable {
     case draft = "Utkast"
     case readyForOffice = "Klar for kontor"
     case processedByOffice = "Behandlet"
+    case notInvoiced = "Ikke fakturert"
     case invoiced = "Fakturert"
 
     var id: String { rawValue }
@@ -105,9 +193,28 @@ private enum InspectionListFilter: String, CaseIterable, Identifiable {
             inspection.workflowStatus == .completedByTechnician || inspection.workflowStatus == .readyForOffice
         case .processedByOffice:
             inspection.workflowStatus == .processedByOffice
+        case .notInvoiced:
+            inspection.workflowStatus != .draft && inspection.workflowStatus != .invoiced
         case .invoiced:
             inspection.workflowStatus == .invoiced
         }
+    }
+}
+
+private struct OfficeSummaryRow: View {
+    let title: String
+    let value: Int
+    let systemImage: String
+
+    var body: some View {
+        HStack {
+            Label(title, systemImage: systemImage)
+            Spacer()
+            Text(value.formatted())
+                .font(.headline)
+                .foregroundStyle(.primary)
+        }
+        .foregroundStyle(.primary)
     }
 }
 
