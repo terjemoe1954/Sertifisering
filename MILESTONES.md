@@ -141,6 +141,14 @@ Ferdig når:
 - En ferdig inspeksjon kan eksporteres som PDF.
 - Kontoret kan bruke samme inspeksjonsdata til å lage eller ferdigstille sertifikat.
 
+Status nå:
+
+- PDF-eksporten bruker inspeksjonsdata med kunde, maskiner, sjekkliste, merknader og signatur.
+- PDF-generering krever minst én maskin, og samme regel brukes i `Kontorsjekk` og eksportknappen.
+- `CertificateBasisExport.swift` lager tekstbasert sertifikatgrunnlag med kunde, sertifikatnummer, maskindata og mangler.
+- Sertifikatgrunnlag krever sertifikatnummer og minst én maskin før det kan deles.
+- Eksportreglene er dekket av enhetstester.
+
 ## Milepæl 5: Status og kontorbehandling i appen
 
 **Formål:** Gjøre det mulig å se hvilke inspeksjoner kontoret må behandle.
@@ -168,6 +176,14 @@ Ferdig når:
 
 - Kontorbruker kan se hva som er klart til behandling.
 - Kontorbruker kan markere inspeksjoner som behandlet eller fakturert.
+
+Status nå:
+
+- Hovedlisten har kontorfilter for `Klar for behandling`, `Behandlet`, `Ikke fakturert` og `Fakturert`.
+- Kontorhandlingene bruker modellregler for behandling, fakturering, PDF og sertifikatgrunnlag.
+- `Kontorsjekk` viser konkrete mangler før kontorbehandling.
+- Kundeoversikten gir tilgang til kunde- og maskinhistorikk.
+- Kontorreglene er dekket av enhetstester.
 
 ## Milepæl 6: iCloud/CloudKit-synk
 
@@ -296,8 +312,10 @@ Ferdig når:
 
 Status nå:
 
-- Statusflyt og fakturagrunnlag har enhetstester.
+- Statusflyt, teknikerkrav, kontorbehandling, eksportregler og fakturagrunnlag har enhetstester.
 - PDF-eksport har en røyk-test som bekrefter at dagens PDF-oppsett fortsatt genererer en gyldig fil.
+- Sertifikatgrunnlag har en test som bekrefter at kunde, maskindata og mangler blir med.
+- UI-testene dekker åpning av hovedlisten, kundeoversikten og brukerveiledningen.
 - `HelpGuideView` har en steg-for-steg pilot-sjekkliste for test med tekniker-iPad og kontor/simulator.
 
 ## Milepæl 10: Klargjøring for fast kontorbruk
@@ -332,22 +350,22 @@ Ferdig når:
 Status nå:
 
 - `SettingsView` viser driftsstatus med valgt rolle, lagringsmodus, totalt antall kontroller og kontorkøer.
-- `HelpGuideView` beskriver daglig kontorrutine og ansvarsdeling mellom tekniker og kontor.
-- Kontorbehandling krever sertifikatnummer før kontrollen kan markeres som behandlet.
+- `HelpGuideView` beskriver daglig kontorrutine, sertifikatgrunnlag, pilot-test og ansvarsdeling mellom tekniker og kontor.
+- Kontorbehandling krever ferdig teknikerstatus, sertifikatnummer og minst én maskin før kontrollen kan markeres som behandlet.
 - Hovedlisten varsler når en kontroll i kontorkøen mangler sertifikatnummer.
-- Detaljbildet viser en egen `Kontorsjekk` for kontor/admin før behandling og fakturering.
+- Detaljbildet viser egne `Teknikersjekk`- og `Kontorsjekk`-seksjoner med konkrete mangler.
 - Hovedlisten og `Kontorsjekk` viser antall sjekkpunkt som er merket med `Mangel`.
 - Fakturagrunnlag i CSV inkluderer `Antall mangler`.
+- Sertifikatgrunnlag kan lages og deles fra detaljbildet når kontorgrunnlaget er komplett.
 
 ## Anbefalt rekkefølge nå
 
-1. Fullfør og stabiliser datamodellen i `InspectionModels.swift`.
-2. Gjør lokal lagring trygg i `PersistenceController.swift`.
-3. Legg inn inspeksjonsstatus og bruk den i `InspectionListView.swift` og `InspectionDetailView.swift`.
-4. Rydd PDF-eksport og sertifikatgrunnlag i `PDFExport.swift`.
-5. Lag enkel kontorvisning basert på dagens `InspectionListView.swift`.
-6. Legg på iCloud/CloudKit-synk når modellene er stabile.
-7. Test med én tekniker og én kontorbruker.
+1. Kjør pilot-testen i `HelpGuideView` med én tekniker-iPad og én kontorenhet eller simulator.
+2. Sammenlign PDF og sertifikatgrunnlag mot ekte kontorbehov og juster tekst/felter.
+3. Test iCloud-deling med reelle Apple ID-er og dårlig eller manglende nett.
+4. Avklar om kontorbruker skal kunne redigere inspeksjonsinnhold eller bare behandle og eksportere.
+5. Test backup og restore med reelle kontroller før fast bruk.
+6. Rydd eventuelle pilotfunn og kjør full testpakke før fast kontorbruk.
 
 ## Viktige valg før CloudKit bygges inn
 

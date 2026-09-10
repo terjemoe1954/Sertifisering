@@ -14,6 +14,7 @@ struct InspectionListView: View {
     @AppStorage("app.user.role") private var userRoleRawValue = AppUserRole.technician.rawValue
     @AppStorage("cloudkit.company.lastSyncStatus") private var lastCloudKitSyncStatus = ""
     @State private var isShowingSettings = false
+    @State private var isShowingCustomerOverview = false
     @State private var selectedFilter: InspectionListFilter = .all
     @State private var hasAppliedRoleDefaultFilter = false
     @State private var hasAttemptedAutomaticDownload = false
@@ -204,6 +205,11 @@ struct InspectionListView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
+                    Button("Kunder", systemImage: "person.3") {
+                        isShowingCustomerOverview = true
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button("Hent delte firmadata", systemImage: "icloud.and.arrow.down") {
                             downloadSharedCompanyData()
@@ -237,6 +243,9 @@ struct InspectionListView: View {
             }
             .sheet(isPresented: $isShowingSettings) {
                 SettingsView()
+            }
+            .sheet(isPresented: $isShowingCustomerOverview) {
+                CustomerOverviewView(inspections: inspections)
             }
             .onAppear {
                 applyRoleDefaultFilterIfNeeded()

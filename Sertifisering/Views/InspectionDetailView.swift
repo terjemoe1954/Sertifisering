@@ -7,6 +7,7 @@ struct InspectionDetailView: View {
     @AppStorage("app.user.role") private var userRoleRawValue = AppUserRole.technician.rawValue
     @Bindable var inspection: Inspection
     @State private var exportedPDFURL: URL?
+    @State private var certificateBasisURL: URL?
     @State private var exportErrorMessage: String?
     @State private var completionErrorMessage: String?
     @State private var cloudKitSyncMessage: String?
@@ -58,8 +59,8 @@ struct InspectionDetailView: View {
                     }
                 }
 
-                if !canCompleteTechnicianInspection && inspection.workflowStatus == .draft {
-                    Text("Fyll ut firma/eier, kontrollør og legg til minst én maskin før kontrollen fullføres.")
+                if !inspection.missingTechnicianCompletionRequirements.isEmpty && inspection.workflowStatus == .draft {
+                    Text("Mangler: \(inspection.missingTechnicianCompletionRequirements.joined(separator: ", ")).")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -90,6 +91,23 @@ struct InspectionDetailView: View {
                 }
             }
 
+            if canUseTechnicianActions {
+                Section("Teknikersjekk") {
+                    OfficeCheckRow(
+                        title: "Firma/eier",
+                        isComplete: !inspection.companyOwner.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
+                    OfficeCheckRow(
+                        title: "Kontrollør",
+                        isComplete: !inspection.inspector.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
+                    OfficeCheckRow(
+                        title: "Minst én maskin",
+                        isComplete: !(inspection.machines ?? []).isEmpty
+                    )
+                }
+            }
+
             if canUseOfficeActions {
                 Section("Kontorsjekk") {
                     OfficeCheckRow(
@@ -102,7 +120,11 @@ struct InspectionDetailView: View {
                     )
                     OfficeCheckRow(
                         title: "PDF kan genereres",
-                        isComplete: !(inspection.machines ?? []).isEmpty
+                        isComplete: inspection.canExportPDF
+                    )
+                    OfficeCheckRow(
+                        title: "Sertifikatgrunnlag kan lages",
+                        isComplete: inspection.canExportCertificateBasis
                     )
                     OfficeCheckRow(
                         title: inspection.checklistRemarkCount == 0 ? "Ingen mangler registrert" : "\(inspection.checklistRemarkCount) mangler registrert",
@@ -112,6 +134,12 @@ struct InspectionDetailView: View {
                         title: "Klar for fakturagrunnlag",
                         isComplete: inspection.isBillingQueue || inspection.isInvoicedQueue
                     )
+
+                    if !inspection.canProcessByOffice {
+                        Text("Mangler før kontorbehandling: \(inspection.missingOfficeProcessingRequirements.joined(separator: ", ")).")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
@@ -151,6 +179,13 @@ struct InspectionDetailView: View {
 
             Section("Eksport") {
                 Button("Generer PDF", systemImage: "doc.richtext", action: exportPDF)
+                    .disabled(!inspection.canExportPDF)
+
+                if !inspection.canExportPDF {
+                    Text("Legg til minst én maskin før PDF genereres.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
                 if let exportedPDFURL {
                     ShareLink(
@@ -158,6 +193,24 @@ struct InspectionDetailView: View {
                         preview: SharePreview("Sertifiseringsrapport", image: Image(systemName: "doc.richtext"))
                     ) {
                         Label("Del PDF", systemImage: "square.and.arrow.up")
+                    }
+                }
+
+                Button("Lag sertifikatgrunnlag", systemImage: "doc.text", action: exportCertificateBasis)
+                    .disabled(!inspection.canExportCertificateBasis)
+
+                if !inspection.canExportCertificateBasis {
+                    Text("Legg inn sertifikatnummer og minst én maskin før sertifikatgrunnlaget lages.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let certificateBasisURL {
+                    ShareLink(
+                        item: certificateBasisURL,
+                        preview: SharePreview("Sertifikatgrunnlag", image: Image(systemName: "doc.text"))
+                    ) {
+                        Label("Del sertifikatgrunnlag", systemImage: "square.and.arrow.up")
                     }
                 }
             }
@@ -197,7 +250,7 @@ struct InspectionDetailView: View {
 
     private func completeTechnicianInspection() {
         guard canCompleteTechnicianInspection else {
-            completionErrorMessage = "Fyll ut firma/eier, kontrollør og legg til minst én maskin før kontrollen fullføres."
+            completionErrorMessage = "Kontrollen mangler: \(inspection.missingTechnicianCompletionRequirements.joined(separator: ", "))."
             return
         }
 
@@ -206,13 +259,8 @@ struct InspectionDetailView: View {
     }
 
     private func processOfficeInspection() {
-        guard inspection.isReadyForOfficeQueue else {
-            completionErrorMessage = "Kontrollen må være ferdig fra tekniker før kontoret kan behandle den."
-            return
-        }
-
-        guard inspection.hasOfficeProcessingData else {
-            completionErrorMessage = "Legg inn sertifikatnummer før kontrollen markeres som behandlet av kontor."
+        guard inspection.canProcessByOffice else {
+            completionErrorMessage = "Kontrollen mangler: \(inspection.missingOfficeProcessingRequirements.joined(separator: ", "))."
             return
         }
 
@@ -287,9 +335,7 @@ struct InspectionDetailView: View {
     }
 
     private var canCompleteTechnicianInspection: Bool {
-        !inspection.companyOwner.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !inspection.inspector.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !(inspection.machines ?? []).isEmpty
+        inspection.canCompleteByTechnician
     }
 
     private var currentRole: AppUserRole {
@@ -313,7 +359,7 @@ struct InspectionDetailView: View {
     }
 
     private var canProcessOfficeInspection: Bool {
-        inspection.isReadyForOfficeQueue && inspection.hasOfficeProcessingData
+        inspection.canProcessByOffice
     }
 
     private var canMarkInspectionInvoiced: Bool {
@@ -321,8 +367,27 @@ struct InspectionDetailView: View {
     }
 
     private func exportPDF() {
+        guard inspection.canExportPDF else {
+            exportErrorMessage = "Legg til minst én maskin før PDF genereres."
+            return
+        }
+
         do {
             exportedPDFURL = try InspectionPDFExporter.export(inspection: inspection)
+            exportErrorMessage = nil
+        } catch {
+            exportErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func exportCertificateBasis() {
+        guard inspection.canExportCertificateBasis else {
+            exportErrorMessage = "Legg inn sertifikatnummer og minst én maskin før sertifikatgrunnlaget lages."
+            return
+        }
+
+        do {
+            certificateBasisURL = try CertificateBasisExporter.export(inspection: inspection)
             exportErrorMessage = nil
         } catch {
             exportErrorMessage = error.localizedDescription

@@ -11,6 +11,13 @@ private let helpGuideMarkdown = """
 ## Opprett kontroll
 Trykk `Ny kontroll` fra hovedskjermen for å starte en ny registrering.
 
+Du kan også trykke `Kunder`, åpne en kunde og starte ny kontroll derfra. Hvis kunden har registrerte maskiner fra før, kan du sveipe på en maskin og velge `Ny kontroll`. Da kopieres faste maskindata inn i en ny kontroll med frisk sjekkliste.
+
+## Kunde- og maskinoversikt
+Trykk `Kunder` i hovedlisten for å se kunder samlet på firma/eier. Åpne en kunde for å se maskiner og tidligere kontroller.
+
+Maskinoversikten samler historikk på serienummer når det finnes, ellers på maskinnavn. Bruk denne visningen når samme maskin skal kontrolleres på nytt.
+
 ## Fyll ut forside
 Legg inn kunde, kontaktperson, sted, kontrollør og status før rapporten deles.
 
@@ -20,11 +27,15 @@ Legg inn kunde, kontaktperson, sted, kontrollør og status før rapporten deles.
 ## Registrer kontrollpunkter
 Velg `OK`, `Mangel` eller `Ikke relevant` for hvert punkt. Legg inn merknad ved behov.
 
-## Signatur og PDF
+## Signatur, PDF og sertifikatgrunnlag
 Fyll inn navn, signer i signaturfeltet og trykk `Generer PDF` for å dele rapporten.
 
+Kontoret kan også trykke `Lag sertifikatgrunnlag` for å lage en tekstfil med kunde, sertifikatnummer, maskindata og mangler. Bruk denne som grunnlag for sertifikat eller arkivering.
+
 ## Ferdigstilling hos tekniker
-Når kontrollen er klar, trykk `Marker ferdig fra tekniker`.
+Detaljbildet viser `Teknikersjekk` med kravene som må være klare før kontrollen kan fullføres: firma/eier, kontrollør og minst én maskin.
+
+Når kontrollen er klar, trykk `Marker ferdig fra tekniker`. Hvis noe mangler, viser appen hvilke felt som må fylles ut.
 
 Hvis iCloud er aktivert, forsøker appen å synke endringen automatisk. Du kan også bruke iCloud-menyen i hovedlisten og trykke `Synk firmadata til deling`.
 
@@ -51,6 +62,7 @@ Som kontorbruker åpner appen normalt køen `Klar for kontor`.
 - `Marker behandlet av kontor`
 - `Marker fakturert`
 - `Generer PDF`
+- `Lag sertifikatgrunnlag`
 
 Når status endres forsøker appen å synke automatisk til iCloud. Du kan også trykke `Synk endringer til iCloud` inne på kontrollen.
 
@@ -64,11 +76,12 @@ Bruk denne rekkefølgen når appen tas i bruk på kontoret:
 3. Start i køen `Klar for behandling`.
 4. Åpne hver kontroll og sjekk kunde, maskin, status, merknader og signatur.
 5. Generer PDF hvis rapporten skal arkiveres eller sendes videre.
-6. Legg inn eller kontroller sertifikatnummer før saken behandles ferdig.
-7. Trykk `Marker behandlet av kontor` når dokumentasjonen er kontrollert.
-8. Gå til `Ikke fakturert` og lag fakturagrunnlag.
-9. Når faktura er sendt eller registrert i regnskapssystemet, trykk `Marker fakturert`.
-10. Synk firmadata etter endt kontorøkt.
+6. Legg inn eller kontroller sertifikatnummer.
+7. Lag sertifikatgrunnlag og kontroller at maskindata og mangler stemmer.
+8. Trykk `Marker behandlet av kontor` når dokumentasjonen er kontrollert.
+9. Gå til `Ikke fakturert` og lag fakturagrunnlag.
+10. Når faktura er sendt eller registrert i regnskapssystemet, trykk `Marker fakturert`.
+11. Synk firmadata etter endt kontorøkt.
 
 Anbefalt ansvarsdeling er at tekniker eier registrering og signatur ute hos kunde, mens kontoret eier sertifikatnummer, PDF-arkivering, fakturagrunnlag og fakturert-status.
 
@@ -82,17 +95,21 @@ Bruk denne sjekklisten med én iPad som tekniker og én simulator eller enhet so
 2. Opprett én kontroll med realistisk kunde, kontaktperson, sted, prosjekt og kontrollør.
 3. Legg inn minst én maskin med serienummer, krannummer eller intern plassering.
 4. Fyll ut flere kontrollpunkter, inkludert minst én `Mangel` med merknad.
-5. Legg inn navn og signaturer.
-6. Generer PDF og kontroller at arket ser riktig ut.
-7. Marker kontrollen som ferdig fra tekniker.
-8. Synk firmadata til iCloud.
-9. Sett kontorenheten til rollen `Kontor`.
-10. Hent delte firmadata og åpne kontrollen.
-11. Generer PDF på kontorenheten og sammenlign med teknikerens PDF.
-12. Marker kontrollen som behandlet av kontor.
-13. Lag fakturagrunnlag fra hovedlisten.
-14. Marker kontrollen som fakturert.
-15. Synk på begge enheter og kontroller at statusene er like.
+5. Sjekk at `Teknikersjekk` viser kravene som fullført.
+6. Legg inn navn og signaturer.
+7. Generer PDF og kontroller at arket ser riktig ut.
+8. Marker kontrollen som ferdig fra tekniker.
+9. Åpne `Kunder`, finn samme kunde og start en ny kontroll fra den registrerte maskinen.
+10. Kontroller at maskindata er kopiert og at sjekklisten er ny.
+11. Synk firmadata til iCloud.
+12. Sett kontorenheten til rollen `Kontor`.
+13. Hent delte firmadata og åpne kontrollen.
+14. Generer PDF på kontorenheten og sammenlign med teknikerens PDF.
+15. Legg inn sertifikatnummer og lag sertifikatgrunnlag.
+16. Marker kontrollen som behandlet av kontor.
+17. Lag fakturagrunnlag fra hovedlisten.
+18. Marker kontrollen som fakturert.
+19. Synk på begge enheter og kontroller at statusene er like.
 
 Test også én kontroll uten nett. Gjør kontrollen ferdig lokalt, slå på nett igjen og synk etterpå.
 

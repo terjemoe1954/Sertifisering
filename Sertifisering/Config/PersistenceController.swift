@@ -37,20 +37,35 @@ enum PersistenceController {
         resolveStorageMode()
     }
 
-    static func makeModelContainer(storageMode: StorageMode = currentStorageMode) throws -> ModelContainer {
+    static func makeModelContainer(
+        storageMode: StorageMode = currentStorageMode,
+        isStoredInMemoryOnly: Bool = false
+    ) throws -> ModelContainer {
         let schema = Schema([
             Inspection.self,
             Machine.self,
             MachineChecklistItem.self
         ])
 
-        let configuration = ModelConfiguration(
-            configurationName(for: storageMode),
-            schema: schema,
-            url: databaseURL(for: storageMode),
-            allowsSave: true,
-            cloudKitDatabase: cloudKitDatabase(for: storageMode)
-        )
+        let configuration: ModelConfiguration
+        if isStoredInMemoryOnly {
+            configuration = ModelConfiguration(
+                "InMemoryStore",
+                schema: schema,
+                isStoredInMemoryOnly: true,
+                allowsSave: true,
+                groupContainer: .automatic,
+                cloudKitDatabase: .none
+            )
+        } else {
+            configuration = ModelConfiguration(
+                configurationName(for: storageMode),
+                schema: schema,
+                url: databaseURL(for: storageMode),
+                allowsSave: true,
+                cloudKitDatabase: cloudKitDatabase(for: storageMode)
+            )
+        }
 
         return try ModelContainer(for: schema, configurations: [configuration])
     }

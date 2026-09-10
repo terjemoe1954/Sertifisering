@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftData
 import Testing
 @testable import Sertifisering
 
@@ -25,6 +26,17 @@ struct SertifiseringTests {
         #expect(PersistenceController.configuredCloudKitContainerIdentifier == "iCloud.com.terjemoe.Sertifisering")
         #expect(PersistenceController.isCloudKitPrepared == true)
         #expect(PersistenceController.isCloudKitEnabledInSettings == false)
+    }
+
+    @Test func inMemoryModelContainerCanStoreInspection() async throws {
+        let container = try PersistenceController.makeModelContainer(isStoredInMemoryOnly: true)
+        let context = container.mainContext
+        let inspection = Inspection(companyOwner: "Testkunde AS")
+
+        context.insert(inspection)
+        try context.save()
+
+        #expect(inspection.companyOwner == "Testkunde AS")
     }
 
     @Test func defaultMachineContainsChecklistFromTemplate() async throws {
@@ -94,6 +106,49 @@ struct SertifiseringTests {
         #expect(completedCertificateNumber.hasOfficeProcessingData == true)
     }
 
+    @Test func officeProcessingRequirementsListMissingFields() async throws {
+        let inspection = Inspection(certificateNumber: "", workflowStatus: .draft)
+
+        #expect(inspection.canProcessByOffice == false)
+        #expect(inspection.missingOfficeProcessingRequirements == ["Ferdig fra tekniker", "Sertifikatnummer", "Minst én maskin"])
+
+        inspection.workflowStatus = .completedByTechnician
+        inspection.certificateNumber = "S-2026-006"
+        inspection.machines = [Machine.makeDefault()]
+
+        #expect(inspection.missingOfficeProcessingRequirements.isEmpty)
+        #expect(inspection.canProcessByOffice == true)
+    }
+
+    @Test func exportsRequireRequiredOfficeData() async throws {
+        let inspection = Inspection(certificateNumber: "", workflowStatus: .readyForOffice)
+
+        #expect(inspection.canExportPDF == false)
+        #expect(inspection.canExportCertificateBasis == false)
+
+        inspection.certificateNumber = "S-2026-005"
+        #expect(inspection.canExportPDF == false)
+        #expect(inspection.canExportCertificateBasis == false)
+
+        inspection.machines = [Machine.makeDefault()]
+        #expect(inspection.canExportPDF == true)
+        #expect(inspection.canExportCertificateBasis == true)
+    }
+
+    @Test func technicianCompletionRequirementsListMissingFields() async throws {
+        let draft = Inspection(companyOwner: "  ", inspector: "")
+
+        #expect(draft.canCompleteByTechnician == false)
+        #expect(draft.missingTechnicianCompletionRequirements == ["Firma/eier", "Kontrollør", "Minst én maskin"])
+
+        draft.companyOwner = "Kunde AS"
+        draft.inspector = "Tekniker Test"
+        draft.machines = [Machine.makeDefault()]
+
+        #expect(draft.missingTechnicianCompletionRequirements.isEmpty)
+        #expect(draft.canCompleteByTechnician == true)
+    }
+
     @Test func checklistRemarkCountCountsMachineRemarks() async throws {
         let inspection = Inspection()
         let machine = Machine()
@@ -149,6 +204,79 @@ struct SertifiseringTests {
         #expect(checklistItem.updatedAt == updatedAt)
     }
 
+    @Test func machineCopyForNewInspectionKeepsIdentityAndResetsChecklist() async throws {
+        let sourceMachine = Machine(
+            name: "Traverskran",
+            category: .crane,
+            machineType: "Kran",
+            serialNumber: "KR-42",
+            annualControl: true,
+            fullService: true,
+            manufacturer: "Konecranes",
+            hoistType: "Talje",
+            craneNumber: "K-10",
+            hoistNumber: "T-20",
+            internalLocation: "Hall A",
+            hourMeter: "1200",
+            loadIndicator: "5T",
+            certificateNumber: "OLD-1",
+            notes: "Gammel merknad",
+            looseObjectsFound: true,
+            looseObjectsRemoved: true,
+            remainingLifetimeDocumented: true,
+            remainingLifetimeSWP: "900",
+            usageCertificateValid: false
+        )
+        sourceMachine.checklistItems = [
+            MachineChecklistItem(sectionOrder: 1, sectionTitle: "Seksjon", itemOrder: 1, code: "1.1", title: "Kontrollpunkt", result: .remark, note: "Gammel mangel")
+        ]
+
+        let copiedMachine = sourceMachine.copyForNewInspection()
+        let copiedChecklistItems = copiedMachine.checklistItems ?? []
+
+        #expect(copiedMachine.id != sourceMachine.id)
+        #expect(copiedMachine.name == "Traverskran")
+        #expect(copiedMachine.serialNumber == "KR-42")
+        #expect(copiedMachine.manufacturer == "Konecranes")
+        #expect(copiedMachine.internalLocation == "Hall A")
+        #expect(copiedMachine.notes.isEmpty)
+        #expect(copiedMachine.looseObjectsFound == false)
+        #expect(copiedMachine.usageCertificateValid == true)
+        #expect(copiedChecklistItems.count == InspectionTemplates.craneSections.reduce(0) { $0 + $1.items.count })
+        #expect(copiedChecklistItems.allSatisfy { $0.result == .ok && $0.note.isEmpty })
+    }
+
+    @Test func customerOverviewGroupsInspectionsByCustomerName() async throws {
+        let firstInspection = Inspection(
+            companyOwner: " Kunde AS ",
+            location: "Verksted",
+            workflowStatus: .readyForOffice
+        )
+        firstInspection.machines = [Machine(name: "Traverskran", serialNumber: "KR-42")]
+
+        let secondInspection = Inspection(
+            companyOwner: "Kunde AS",
+            location: "Lager",
+            workflowStatus: .processedByOffice
+        )
+        secondInspection.machines = [
+            Machine(name: "Traverskran", serialNumber: "KR-42"),
+            Machine(name: "Lettbane", serialNumber: "LB-7")
+        ]
+
+        let missingCustomer = Inspection(companyOwner: "   ")
+
+        let entries = CustomerOverviewEntry.makeEntries(from: [missingCustomer, secondInspection, firstInspection])
+
+        #expect(entries.count == 1)
+        #expect(entries.first?.name == "Kunde AS")
+        #expect(entries.first?.inspections.count == 2)
+        #expect(entries.first?.machineCount == 2)
+        #expect(entries.first?.machineSummaries.first(where: { $0.title == "Traverskran" })?.inspections.count == 2)
+        #expect(entries.first?.readyForOfficeCount == 1)
+        #expect(entries.first?.billingQueueCount == 1)
+    }
+
     @Test func billingCSVExporterBuildsOfficeInvoiceRows() async throws {
         let inspection = Inspection(
             certificateNumber: "S-2026-001",
@@ -175,6 +303,47 @@ struct SertifiseringTests {
         #expect(csv.contains("\"Kunde \"\"Nord\"\"; AS\""))
         #expect(csv.contains("\"Godkjent med mangel\";\"Behandlet av kontor\""))
         #expect(csv.contains("\"1\";\"1\";\"Traverskran Kran KR-42\""))
+    }
+
+    @Test func certificateBasisExporterBuildsOfficeSummary() async throws {
+        let inspection = Inspection(
+            certificateNumber: "S-2026-004",
+            companyOwner: "Testkunde AS",
+            contactPerson: "Kari Test",
+            phone: "41111111",
+            address: "Testveien 2",
+            inspector: "Tekniker Test",
+            location: "Testhall",
+            projectNumber: "P-1004",
+            overallNotes: "Kontroller før sertifikat.",
+            signatureCustomerName: "Kari Test",
+            signatureInspectorName: "Tekniker Test",
+            status: .approvedWithRemarks,
+            workflowStatus: .processedByOffice
+        )
+        let machine = Machine(
+            name: "Traverskran test",
+            machineType: "Kran",
+            serialNumber: "KR-99",
+            manufacturer: "Konecranes",
+            craneNumber: "K-99",
+            internalLocation: "Hall B",
+            loadIndicator: "5T"
+        )
+        machine.checklistItems = [
+            MachineChecklistItem(sectionOrder: 1, sectionTitle: "Seksjon", itemOrder: 1, code: "1.1", title: "Sprekker", result: .remark, note: "Utbedres")
+        ]
+        inspection.machines = [machine]
+
+        let text = CertificateBasisExporter.makeText(inspection: inspection)
+
+        #expect(text.contains("Sertifikatgrunnlag"))
+        #expect(text.contains("Sertifikatnummer: S-2026-004"))
+        #expect(text.contains("Kunde: Testkunde AS"))
+        #expect(text.contains("- Traverskran test / KR-99"))
+        #expect(text.contains("Produsent: Konecranes"))
+        #expect(text.contains("Antall mangler: 1"))
+        #expect(text.contains("1.1 Sprekker - Utbedres"))
     }
 
     @Test func pdfExporterCreatesReadablePDFFile() async throws {

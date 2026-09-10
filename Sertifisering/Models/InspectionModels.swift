@@ -331,6 +331,58 @@ extension Inspection {
         !certificateNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    var canExportPDF: Bool {
+        !(machines ?? []).isEmpty
+    }
+
+    var canExportCertificateBasis: Bool {
+        hasOfficeProcessingData && canExportPDF
+    }
+
+    var canProcessByOffice: Bool {
+        missingOfficeProcessingRequirements.isEmpty
+    }
+
+    var missingOfficeProcessingRequirements: [String] {
+        var missingRequirements: [String] = []
+
+        if !isReadyForOfficeQueue {
+            missingRequirements.append("Ferdig fra tekniker")
+        }
+
+        if !hasOfficeProcessingData {
+            missingRequirements.append("Sertifikatnummer")
+        }
+
+        if !canExportPDF {
+            missingRequirements.append("Minst én maskin")
+        }
+
+        return missingRequirements
+    }
+
+    var canCompleteByTechnician: Bool {
+        missingTechnicianCompletionRequirements.isEmpty
+    }
+
+    var missingTechnicianCompletionRequirements: [String] {
+        var missingRequirements: [String] = []
+
+        if companyOwner.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            missingRequirements.append("Firma/eier")
+        }
+
+        if inspector.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            missingRequirements.append("Kontrollør")
+        }
+
+        if (machines ?? []).isEmpty {
+            missingRequirements.append("Minst én maskin")
+        }
+
+        return missingRequirements
+    }
+
     var checklistRemarkCount: Int {
         (machines ?? []).reduce(0) { count, machine in
             count + (machine.checklistItems ?? []).filter { $0.result == .remark }.count
@@ -488,7 +540,34 @@ final class MachineChecklistItem {
 extension Machine {
     static func makeDefault() -> Machine {
         let machine = Machine(name: "Ny maskin")
-        machine.checklistItems = InspectionTemplates.craneSections.flatMap { section in
+        machine.checklistItems = makeChecklistItems()
+        return machine
+    }
+
+    func copyForNewInspection() -> Machine {
+        let machine = Machine(
+            name: name,
+            category: category,
+            machineType: machineType,
+            serialNumber: serialNumber,
+            annualControl: annualControl,
+            fullService: fullService,
+            manufacturer: manufacturer,
+            hoistType: hoistType,
+            craneNumber: craneNumber,
+            hoistNumber: hoistNumber,
+            internalLocation: internalLocation,
+            hourMeter: hourMeter,
+            loadIndicator: loadIndicator,
+            certificateNumber: certificateNumber,
+            remainingLifetimeSWP: remainingLifetimeSWP
+        )
+        machine.checklistItems = Self.makeChecklistItems()
+        return machine
+    }
+
+    private static func makeChecklistItems() -> [MachineChecklistItem] {
+        InspectionTemplates.craneSections.flatMap { section in
             section.items.map { item in
                 MachineChecklistItem(
                     sectionOrder: section.order,
@@ -499,6 +578,5 @@ extension Machine {
                 )
             }
         }
-        return machine
     }
 }
