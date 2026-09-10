@@ -10,6 +10,7 @@ import SwiftData
 
 @main
 struct SertifiseringApp: App {
+    @UIApplicationDelegateAdaptor(CloudKitSharingAppDelegate.self) private var cloudKitSharingAppDelegate
     private let modelContainer: ModelContainer
     @AppStorage("app.appearance.mode") private var appearanceModeRawValue = AppAppearance.system.rawValue
 

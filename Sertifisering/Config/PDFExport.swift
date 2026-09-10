@@ -11,7 +11,7 @@ enum InspectionPDFExporter {
         let data = renderer.pdfData { context in
             drawCoverPage(in: context, inspection: inspection, pageRect: pageRect, margin: margin)
 
-            for machine in inspection.machines {
+            for machine in inspection.machines ?? [] {
                 drawMachinePage(in: context, inspection: inspection, machine: machine, pageRect: pageRect, margin: margin)
             }
         }
@@ -74,7 +74,7 @@ enum InspectionPDFExporter {
         drawLabeledField(label: "Sted", value: inspection.location, rect: CGRect(x: margin + 10, y: y + 40, width: leftColumnWidth - 20, height: 22), labelWidth: 64, labelAttributes: headingAttributes, valueAttributes: bodyAttributes)
         drawLabeledField(label: "Kontrollør", value: inspection.inspector, rect: CGRect(x: margin + 10, y: y + 70, width: leftColumnWidth - 20, height: 22), labelWidth: 64, labelAttributes: headingAttributes, valueAttributes: bodyAttributes)
         drawLabeledField(label: "Sertifikat", value: inspection.certificateNumber, rect: CGRect(x: margin + leftColumnWidth, y: y + 10, width: width - leftColumnWidth - 10, height: 22), labelWidth: 62, labelAttributes: headingAttributes, valueAttributes: bodyAttributes)
-        drawLabeledField(label: "Ant. maskiner", value: "\(inspection.machines.count)", rect: CGRect(x: margin + leftColumnWidth, y: y + 40, width: width - leftColumnWidth - 10, height: 22), labelWidth: 80, labelAttributes: headingAttributes, valueAttributes: bodyAttributes)
+        drawLabeledField(label: "Ant. maskiner", value: "\((inspection.machines ?? []).count)", rect: CGRect(x: margin + leftColumnWidth, y: y + 40, width: width - leftColumnWidth - 10, height: 22), labelWidth: 80, labelAttributes: headingAttributes, valueAttributes: bodyAttributes)
         drawLabeledField(label: "Ant. vedlegg", value: inspection.attachmentsCount, rect: CGRect(x: margin + leftColumnWidth, y: y + 70, width: width - leftColumnWidth - 10, height: 22), labelWidth: 80, labelAttributes: headingAttributes, valueAttributes: bodyAttributes)
         drawStatusRow(status: inspection.status, origin: CGPoint(x: margin + leftColumnWidth + 10, y: y + 104))
         y += metaBlockHeight + 12
@@ -275,7 +275,7 @@ enum InspectionPDFExporter {
     ) -> CGFloat {
         var y = startY
         let width = pageRect.width - margin * 2
-        let groupedItems = Dictionary(grouping: machine.checklistItems, by: \.sectionTitle)
+        let groupedItems = Dictionary(grouping: machine.checklistItems ?? [], by: \.sectionTitle)
             .map { key, items in
                 let sortedItems = items.sorted { lhs, rhs in
                     if lhs.itemOrder == rhs.itemOrder {

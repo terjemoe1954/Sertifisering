@@ -201,6 +201,18 @@ Ferdig når:
 - Kontorbruker kan se samme inspeksjon på en annen enhet.
 - Appen håndterer midlertidig manglende nett uten datatap.
 
+Status nå:
+
+- iCloud/CloudKit kan slås på i `SettingsView`.
+- Appen er testet med synk mellom iPad og simulator på samme Apple ID.
+- Egen CloudKit-delingssone for firmadata er lagt inn.
+- `SettingsView` og hovedlisten har knapp for å synke firmadata til iCloud.
+- `SettingsView` har knapp for å dele firmadata med kontorbruker via CloudKit Sharing.
+- Kontorbruker kan akseptere deling og hente data fra `sharedCloudDatabase`.
+- Toveis manuell synk er testet mellom iPad og simulator med ulike Apple ID-er.
+- Hovedlisten har iCloud-meny, dra-ned-for-å-hente og automatisk første henting for kontor/admin.
+- Detaljbildet forsøker automatisk iCloud-synk når arbeidsstatus endres.
+
 ## Milepæl 7: Brukerroller
 
 **Formål:** Skille teknikerfunksjoner fra kontorfunksjoner uten å gjøre appen unødvendig komplisert.
@@ -251,6 +263,12 @@ Ferdig når:
 - Kontorbruker kan finne alle inspeksjoner som ikke er fakturert.
 - Kontorbruker kan eksportere et ryddig fakturagrunnlag.
 
+Status nå:
+
+- Kontorvisningen viser egen kø for `Ikke fakturert`.
+- Kontorbruker kan lage og dele CSV-basert fakturagrunnlag fra behandlede kontroller.
+- CSV-eksporten ligger i egen eksporthjelper og er dekket av en enkel enhetstest.
+
 ## Milepæl 9: Test og pilotbruk
 
 **Formål:** Prøve appen i ekte arbeid før den brukes fast.
@@ -275,6 +293,12 @@ Ferdig når:
 
 - Minst noen reelle inspeksjoner er gjennomført fra start til slutt.
 - Kontoret kan behandle disse uten manuell rydding i dataene.
+
+Status nå:
+
+- Statusflyt og fakturagrunnlag har enhetstester.
+- PDF-eksport har en røyk-test som bekrefter at dagens PDF-oppsett fortsatt genererer en gyldig fil.
+- `HelpGuideView` har en steg-for-steg pilot-sjekkliste for test med tekniker-iPad og kontor/simulator.
 
 ## Milepæl 10: Klargjøring for fast kontorbruk
 
@@ -304,6 +328,16 @@ Ferdig når:
 - Kontoret kan hente ferdige inspeksjoner.
 - Kontoret kan lage sertifikat og fakturagrunnlag.
 - Data flyter uten manuell kopiering mellom enheter.
+
+Status nå:
+
+- `SettingsView` viser driftsstatus med valgt rolle, lagringsmodus, totalt antall kontroller og kontorkøer.
+- `HelpGuideView` beskriver daglig kontorrutine og ansvarsdeling mellom tekniker og kontor.
+- Kontorbehandling krever sertifikatnummer før kontrollen kan markeres som behandlet.
+- Hovedlisten varsler når en kontroll i kontorkøen mangler sertifikatnummer.
+- Detaljbildet viser en egen `Kontorsjekk` for kontor/admin før behandling og fakturering.
+- Hovedlisten og `Kontorsjekk` viser antall sjekkpunkt som er merket med `Mangel`.
+- Fakturagrunnlag i CSV inkluderer `Antall mangler`.
 
 ## Anbefalt rekkefølge nå
 

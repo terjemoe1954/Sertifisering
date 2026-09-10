@@ -198,31 +198,31 @@ enum InspectionTemplates {
 
 @Model
 final class Inspection {
-    var id: UUID
-    var createdAt: Date
-    var updatedAt: Date
+    var id: UUID = UUID()
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
     var completedAt: Date?
     var processedAt: Date?
     var invoicedAt: Date?
-    var certificateNumber: String { didSet { touch() } }
-    var companyOwner: String { didSet { touch() } }
-    var contactPerson: String { didSet { touch() } }
-    var phone: String { didSet { touch() } }
-    var address: String { didSet { touch() } }
-    var inspector: String { didSet { touch() } }
-    var location: String { didSet { touch() } }
-    var projectNumber: String { didSet { touch() } }
-    var overallNotes: String { didSet { touch() } }
-    var signatureCustomerName: String { didSet { touch() } }
-    var signatureInspectorName: String { didSet { touch() } }
-    var attachmentsCount: String { didSet { touch() } }
-    @Attribute(.externalStorage) var customerSignatureData: Data { didSet { touch() } }
-    @Attribute(.externalStorage) var inspectorSignatureData: Data { didSet { touch() } }
-    var statusRawValue: String
-    var workflowStatusRawValue: String
+    var certificateNumber: String = "" { didSet { touch() } }
+    var companyOwner: String = "" { didSet { touch() } }
+    var contactPerson: String = "" { didSet { touch() } }
+    var phone: String = "" { didSet { touch() } }
+    var address: String = "" { didSet { touch() } }
+    var inspector: String = "" { didSet { touch() } }
+    var location: String = "" { didSet { touch() } }
+    var projectNumber: String = "" { didSet { touch() } }
+    var overallNotes: String = "" { didSet { touch() } }
+    var signatureCustomerName: String = "" { didSet { touch() } }
+    var signatureInspectorName: String = "" { didSet { touch() } }
+    var attachmentsCount: String = "" { didSet { touch() } }
+    @Attribute(.externalStorage) var customerSignatureData: Data = Data() { didSet { touch() } }
+    @Attribute(.externalStorage) var inspectorSignatureData: Data = Data() { didSet { touch() } }
+    var statusRawValue: String = InspectionStatus.approved.rawValue
+    var workflowStatusRawValue: String = InspectionWorkflowStatus.draft.rawValue
 
     @Relationship(deleteRule: .cascade, inverse: \Machine.inspection)
-    var machines: [Machine]
+    var machines: [Machine]? = []
 
     init(
         id: UUID = UUID(),
@@ -314,36 +314,60 @@ final class Inspection {
     }
 }
 
+extension Inspection {
+    var isReadyForOfficeQueue: Bool {
+        workflowStatus == .completedByTechnician || workflowStatus == .readyForOffice
+    }
+
+    var isBillingQueue: Bool {
+        workflowStatus == .processedByOffice
+    }
+
+    var isInvoicedQueue: Bool {
+        workflowStatus == .invoiced
+    }
+
+    var hasOfficeProcessingData: Bool {
+        !certificateNumber.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var checklistRemarkCount: Int {
+        (machines ?? []).reduce(0) { count, machine in
+            count + (machine.checklistItems ?? []).filter { $0.result == .remark }.count
+        }
+    }
+}
+
 @Model
 final class Machine {
-    var id: UUID
-    var createdAt: Date
-    var updatedAt: Date
-    var name: String { didSet { touch() } }
-    var categoryRawValue: String
-    var machineType: String { didSet { touch() } }
-    var serialNumber: String { didSet { touch() } }
-    var annualControl: Bool { didSet { touch() } }
-    var fullService: Bool { didSet { touch() } }
-    var manufacturer: String { didSet { touch() } }
-    var hoistType: String { didSet { touch() } }
-    var craneNumber: String { didSet { touch() } }
-    var hoistNumber: String { didSet { touch() } }
-    var internalLocation: String { didSet { touch() } }
-    var hourMeter: String { didSet { touch() } }
-    var loadIndicator: String { didSet { touch() } }
-    var certificateNumber: String { didSet { touch() } }
-    var notes: String { didSet { touch() } }
-    var looseObjectsFound: Bool { didSet { touch() } }
-    var looseObjectsRemoved: Bool { didSet { touch() } }
-    var remainingLifetimeDocumented: Bool { didSet { touch() } }
-    var remainingLifetimeSWP: String { didSet { touch() } }
-    var usageCertificateValid: Bool { didSet { touch() } }
+    var id: UUID = UUID()
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
+    var name: String = "" { didSet { touch() } }
+    var categoryRawValue: String = MachineCategory.crane.rawValue
+    var machineType: String = "Kran" { didSet { touch() } }
+    var serialNumber: String = "" { didSet { touch() } }
+    var annualControl: Bool = true { didSet { touch() } }
+    var fullService: Bool = false { didSet { touch() } }
+    var manufacturer: String = "" { didSet { touch() } }
+    var hoistType: String = "" { didSet { touch() } }
+    var craneNumber: String = "" { didSet { touch() } }
+    var hoistNumber: String = "" { didSet { touch() } }
+    var internalLocation: String = "" { didSet { touch() } }
+    var hourMeter: String = "" { didSet { touch() } }
+    var loadIndicator: String = "" { didSet { touch() } }
+    var certificateNumber: String = "" { didSet { touch() } }
+    var notes: String = "" { didSet { touch() } }
+    var looseObjectsFound: Bool = false { didSet { touch() } }
+    var looseObjectsRemoved: Bool = false { didSet { touch() } }
+    var remainingLifetimeDocumented: Bool = false { didSet { touch() } }
+    var remainingLifetimeSWP: String = "" { didSet { touch() } }
+    var usageCertificateValid: Bool = true { didSet { touch() } }
 
     var inspection: Inspection?
 
     @Relationship(deleteRule: .cascade, inverse: \MachineChecklistItem.machine)
-    var checklistItems: [MachineChecklistItem]
+    var checklistItems: [MachineChecklistItem]? = []
 
     init(
         id: UUID = UUID(),
@@ -412,15 +436,15 @@ final class Machine {
 
 @Model
 final class MachineChecklistItem {
-    var id: UUID
-    var updatedAt: Date
-    var sectionOrder: Int
-    var sectionTitle: String
-    var itemOrder: Int
-    var code: String
-    var title: String
-    var resultRawValue: String
-    var note: String { didSet { touch() } }
+    var id: UUID = UUID()
+    var updatedAt: Date = Date()
+    var sectionOrder: Int = 0
+    var sectionTitle: String = ""
+    var itemOrder: Int = 0
+    var code: String = ""
+    var title: String = ""
+    var resultRawValue: String = ChecklistResult.ok.rawValue
+    var note: String = "" { didSet { touch() } }
 
     var machine: Machine?
 

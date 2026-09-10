@@ -3,12 +3,13 @@ import SwiftData
 
 enum PersistenceController {
     static let databaseFileName = "Sertifisering.store"
+    static let cloudKitDatabaseFileName = "SertifiseringCloud.store"
     static let backupDirectoryName = "MigrationBackups"
     static let migrationMetadataKey = "persistence.migration.metadata"
     static let pendingRestoreBackupNameKey = "persistence.pending_restore_backup_name"
     static let cloudKitEnabledDefaultsKey = "persistence.cloudkit.enabled"
     static let cloudKitContainerDefaultsKey = "persistence.cloudkit.container"
-    static let defaultCloudKitContainerIdentifier = "iCloud.com.example.Sertifisering"
+    static let defaultCloudKitContainerIdentifier = "iCloud.com.terjemoe.Sertifisering"
     static let onlineGuideURLString = "https://example.com/sertifisering/brukerveiledning"
 
     enum StorageMode: Equatable {
@@ -46,7 +47,7 @@ enum PersistenceController {
         let configuration = ModelConfiguration(
             configurationName(for: storageMode),
             schema: schema,
-            url: databaseURL,
+            url: databaseURL(for: storageMode),
             allowsSave: true,
             cloudKitDatabase: cloudKitDatabase(for: storageMode)
         )
@@ -148,14 +149,11 @@ enum PersistenceController {
     }
 
     static var databaseURL: URL {
-        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let appDirectory = directory.appendingPathComponent("Sertifisering", isDirectory: true)
+        databaseURL(fileName: databaseFileName)
+    }
 
-        if !FileManager.default.fileExists(atPath: appDirectory.path) {
-            try? FileManager.default.createDirectory(at: appDirectory, withIntermediateDirectories: true)
-        }
-
-        return appDirectory.appendingPathComponent(databaseFileName)
+    static var cloudKitDatabaseURL: URL {
+        databaseURL(fileName: cloudKitDatabaseFileName)
     }
 
     static var databaseDisplayPath: String {
@@ -168,6 +166,10 @@ enum PersistenceController {
 
     static var isCloudKitPrepared: Bool {
         configuredCloudKitContainerIdentifier != nil
+    }
+
+    static var isCloudKitEnabledInSettings: Bool {
+        UserDefaults.standard.bool(forKey: cloudKitEnabledDefaultsKey)
     }
 
     static var configuredCloudKitContainerIdentifier: String? {
@@ -194,18 +196,18 @@ enum PersistenceController {
     }
 
     static var cloudKitStatusText: String {
-        if UserDefaults.standard.bool(forKey: cloudKitEnabledDefaultsKey) {
+        if isCloudKitEnabledInSettings {
             if let identifier = configuredCloudKitContainerIdentifier {
-                return "iCloud-synk er aktivert i konfigurasjon med container \(identifier)."
+                return "iCloud-testmodus er slått på. Appen bruker container \(identifier) etter restart."
             }
-            return "iCloud-synk er slått på i konfigurasjon, men container-ID mangler fortsatt."
+            return "iCloud-testmodus er slått på, men container-ID mangler. Appen fortsetter lokalt til dette er satt."
         }
 
         if let identifier = configuredCloudKitContainerIdentifier {
-            return "iCloud-synk er klargjort, men avslått. Container: \(identifier)."
+            return "iCloud-testmodus er avslått. Container-ID er lagret: \(identifier)."
         }
 
-        return "iCloud-synk er avslått. Legg inn riktig container-ID før aktivering."
+        return "iCloud-testmodus er avslått. Legg inn riktig container-ID før aktivering."
     }
 
     static var restoreStatusText: String {
@@ -254,6 +256,26 @@ enum PersistenceController {
         }
 
         return .cloudKitPrivate(containerIdentifier: containerIdentifier)
+    }
+
+    private static func databaseURL(for storageMode: StorageMode) -> URL {
+        switch storageMode {
+        case .localOnly:
+            return databaseURL
+        case .cloudKitPrivate:
+            return cloudKitDatabaseURL
+        }
+    }
+
+    private static func databaseURL(fileName: String) -> URL {
+        let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let appDirectory = directory.appendingPathComponent("Sertifisering", isDirectory: true)
+
+        if !FileManager.default.fileExists(atPath: appDirectory.path) {
+            try? FileManager.default.createDirectory(at: appDirectory, withIntermediateDirectories: true)
+        }
+
+        return appDirectory.appendingPathComponent(fileName)
     }
 
     private static func existingStoreFiles() -> [URL] {

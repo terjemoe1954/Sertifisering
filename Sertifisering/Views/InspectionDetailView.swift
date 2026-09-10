@@ -3,10 +3,14 @@ import SwiftData
 
 struct InspectionDetailView: View {
     @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Inspection.createdAt, order: .reverse) private var inspections: [Inspection]
+    @AppStorage("app.user.role") private var userRoleRawValue = AppUserRole.technician.rawValue
     @Bindable var inspection: Inspection
     @State private var exportedPDFURL: URL?
     @State private var exportErrorMessage: String?
     @State private var completionErrorMessage: String?
+    @State private var cloudKitSyncMessage: String?
+    @State private var isUploadingCompanyData = false
 
     var body: some View {
         Form {
@@ -35,14 +39,24 @@ struct InspectionDetailView: View {
                     }
                 }
 
-                Button("Marker ferdig fra tekniker", systemImage: "checkmark.seal", action: completeTechnicianInspection)
-                    .disabled(!canCompleteTechnicianInspection || inspection.workflowStatus != .draft)
+                if canUseTechnicianActions {
+                    Button("Marker ferdig fra tekniker", systemImage: "checkmark.seal", action: completeTechnicianInspection)
+                        .disabled(!canCompleteTechnicianInspection || inspection.workflowStatus != .draft)
+                }
 
-                Button("Marker behandlet av kontor", systemImage: "tray.full", action: processOfficeInspection)
-                    .disabled(!canProcessOfficeInspection)
+                if canUseOfficeActions {
+                    Button("Marker behandlet av kontor", systemImage: "tray.full", action: processOfficeInspection)
+                        .disabled(!canProcessOfficeInspection)
 
-                Button("Marker fakturert", systemImage: "checkmark.circle", action: markInspectionInvoiced)
-                    .disabled(!canMarkInspectionInvoiced)
+                    Button("Marker fakturert", systemImage: "checkmark.circle", action: markInspectionInvoiced)
+                        .disabled(!canMarkInspectionInvoiced)
+
+                    if inspection.isReadyForOfficeQueue && !inspection.hasOfficeProcessingData {
+                        Text("Legg inn sertifikatnummer før kontrollen markeres som behandlet av kontor.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
                 if !canCompleteTechnicianInspection && inspection.workflowStatus == .draft {
                     Text("Fyll ut firma/eier, kontrollør og legg til minst én maskin før kontrollen fullføres.")
@@ -50,7 +64,7 @@ struct InspectionDetailView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if inspection.workflowStatus != .draft {
+                if canResetWorkflow && inspection.workflowStatus != .draft {
                     Button("Tilbakestill til utkast", systemImage: "arrow.uturn.backward", role: .destructive, action: resetToDraft)
                 }
 
@@ -65,15 +79,49 @@ struct InspectionDetailView: View {
                 if let invoicedAt = inspection.invoicedAt {
                     LabeledContent("Fakturert", value: invoicedAt.formatted(date: .abbreviated, time: .shortened))
                 }
+
+                Button("Synk endringer til iCloud", systemImage: "icloud.and.arrow.up", action: uploadCompanyData)
+                    .disabled(!PersistenceController.isCloudKitPrepared || inspections.isEmpty || isUploadingCompanyData)
+
+                if let cloudKitSyncMessage {
+                    Text(cloudKitSyncMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if canUseOfficeActions {
+                Section("Kontorsjekk") {
+                    OfficeCheckRow(
+                        title: "Ferdig fra tekniker",
+                        isComplete: inspection.isReadyForOfficeQueue || inspection.workflowStatus == .processedByOffice || inspection.workflowStatus == .invoiced
+                    )
+                    OfficeCheckRow(
+                        title: "Sertifikatnummer",
+                        isComplete: inspection.hasOfficeProcessingData
+                    )
+                    OfficeCheckRow(
+                        title: "PDF kan genereres",
+                        isComplete: !(inspection.machines ?? []).isEmpty
+                    )
+                    OfficeCheckRow(
+                        title: inspection.checklistRemarkCount == 0 ? "Ingen mangler registrert" : "\(inspection.checklistRemarkCount) mangler registrert",
+                        isComplete: inspection.checklistRemarkCount == 0
+                    )
+                    OfficeCheckRow(
+                        title: "Klar for fakturagrunnlag",
+                        isComplete: inspection.isBillingQueue || inspection.isInvoicedQueue
+                    )
+                }
             }
 
             Section("Maskiner") {
-                if inspection.machines.isEmpty {
+                if (inspection.machines ?? []).isEmpty {
                     Text("Ingen maskiner lagt til")
                         .foregroundStyle(.secondary)
                 }
 
-                ForEach(inspection.machines) { machine in
+                ForEach(inspection.machines ?? []) { machine in
                     NavigationLink {
                         MachineDetailView(machine: machine)
                     } label: {
@@ -87,7 +135,9 @@ struct InspectionDetailView: View {
                 }
                 .onDelete(perform: deleteMachines)
 
-                Button("Legg til maskin", systemImage: "plus", action: addMachine)
+                if canEditTechnicalContent {
+                    Button("Legg til maskin", systemImage: "plus", action: addMachine)
+                }
             }
 
             Section("Merknader og signatur") {
@@ -129,13 +179,19 @@ struct InspectionDetailView: View {
     private func addMachine() {
         let machine = Machine.makeDefault()
         machine.inspection = inspection
-        inspection.machines.append(machine)
+        inspection.machines = (inspection.machines ?? []) + [machine]
         modelContext.insert(machine)
     }
 
     private func deleteMachines(at offsets: IndexSet) {
+        guard canEditTechnicalContent else {
+            completionErrorMessage = "Kontorrollen kan ikke slette maskiner fra kontrollen."
+            return
+        }
+
+        let machines = inspection.machines ?? []
         for index in offsets {
-            modelContext.delete(inspection.machines[index])
+            modelContext.delete(machines[index])
         }
     }
 
@@ -146,17 +202,22 @@ struct InspectionDetailView: View {
         }
 
         inspection.workflowStatus = .completedByTechnician
-        saveChanges()
+        saveAndSyncWorkflowChange()
     }
 
     private func processOfficeInspection() {
-        guard canProcessOfficeInspection else {
+        guard inspection.isReadyForOfficeQueue else {
             completionErrorMessage = "Kontrollen må være ferdig fra tekniker før kontoret kan behandle den."
             return
         }
 
+        guard inspection.hasOfficeProcessingData else {
+            completionErrorMessage = "Legg inn sertifikatnummer før kontrollen markeres som behandlet av kontor."
+            return
+        }
+
         inspection.workflowStatus = .processedByOffice
-        saveChanges()
+        saveAndSyncWorkflowChange()
     }
 
     private func markInspectionInvoiced() {
@@ -166,7 +227,7 @@ struct InspectionDetailView: View {
         }
 
         inspection.workflowStatus = .invoiced
-        saveChanges()
+        saveAndSyncWorkflowChange()
     }
 
     private func resetToDraft() {
@@ -174,25 +235,85 @@ struct InspectionDetailView: View {
         inspection.completedAt = nil
         inspection.processedAt = nil
         inspection.invoicedAt = nil
-        saveChanges()
+        saveAndSyncWorkflowChange()
     }
 
-    private func saveChanges() {
+    @discardableResult
+    private func saveChanges() -> Bool {
+        do {
+            try modelContext.save()
+            return true
+        } catch {
+            completionErrorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    private func saveAndSyncWorkflowChange() {
+        guard saveChanges() else {
+            return
+        }
+
+        if PersistenceController.isCloudKitPrepared {
+            uploadCompanyData()
+        } else {
+            cloudKitSyncMessage = "Endring lagret lokalt. iCloud er ikke aktivert."
+        }
+    }
+
+    private func uploadCompanyData() {
         do {
             try modelContext.save()
         } catch {
-            completionErrorMessage = error.localizedDescription
+            cloudKitSyncMessage = "Kunne ikke lagre før synk: \(error.localizedDescription)"
+            return
+        }
+
+        isUploadingCompanyData = true
+        cloudKitSyncMessage = "Sender endringer til iCloud..."
+
+        CloudKitSharingSupport.uploadCompanyData(inspections: inspections) { result in
+            Task { @MainActor in
+                isUploadingCompanyData = false
+
+                switch result {
+                case .success(let summary):
+                    cloudKitSyncMessage = "Synket til \(summary.targetDescription): \(summary.recordCount) poster."
+                case .failure(let error):
+                    cloudKitSyncMessage = "Kunne ikke synke endringer: \(error.localizedDescription)"
+                }
+            }
         }
     }
 
     private var canCompleteTechnicianInspection: Bool {
         !inspection.companyOwner.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !inspection.inspector.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !inspection.machines.isEmpty
+        !(inspection.machines ?? []).isEmpty
+    }
+
+    private var currentRole: AppUserRole {
+        AppUserRole(rawValue: userRoleRawValue) ?? .technician
+    }
+
+    private var canEditTechnicalContent: Bool {
+        currentRole == .technician || currentRole == .admin
+    }
+
+    private var canUseTechnicianActions: Bool {
+        currentRole == .technician || currentRole == .admin
+    }
+
+    private var canUseOfficeActions: Bool {
+        currentRole == .office || currentRole == .admin
+    }
+
+    private var canResetWorkflow: Bool {
+        currentRole == .technician || currentRole == .admin
     }
 
     private var canProcessOfficeInspection: Bool {
-        inspection.workflowStatus == .completedByTechnician || inspection.workflowStatus == .readyForOffice
+        inspection.isReadyForOfficeQueue && inspection.hasOfficeProcessingData
     }
 
     private var canMarkInspectionInvoiced: Bool {
@@ -228,5 +349,19 @@ struct InspectionDetailView: View {
                 }
             }
         )
+    }
+}
+
+private struct OfficeCheckRow: View {
+    let title: String
+    let isComplete: Bool
+
+    var body: some View {
+        Label {
+            Text(title)
+        } icon: {
+            Image(systemName: isComplete ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .foregroundStyle(isComplete ? .green : .orange)
+        }
     }
 }

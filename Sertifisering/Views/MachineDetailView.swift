@@ -1,10 +1,11 @@
 import SwiftUI
 
 struct MachineDetailView: View {
+    @AppStorage("app.user.role") private var userRoleRawValue = AppUserRole.technician.rawValue
     @Bindable var machine: Machine
 
     private var groupedItems: [(section: String, items: [MachineChecklistItem])] {
-        Dictionary(grouping: machine.checklistItems, by: \.sectionTitle)
+        Dictionary(grouping: machine.checklistItems ?? [], by: \.sectionTitle)
             .map { key, items in
                 let sortedItems = items.sorted { lhs, rhs in
                     if lhs.itemOrder == rhs.itemOrder {
@@ -65,8 +66,17 @@ struct MachineDetailView: View {
                     .lineLimit(3, reservesSpace: true)
             }
         }
+        .disabled(!canEditTechnicalContent)
         .navigationTitle(machine.name.isEmpty ? "Maskin" : machine.name)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var currentRole: AppUserRole {
+        AppUserRole(rawValue: userRoleRawValue) ?? .technician
+    }
+
+    private var canEditTechnicalContent: Bool {
+        currentRole == .technician || currentRole == .admin
     }
 }
 
