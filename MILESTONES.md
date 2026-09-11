@@ -283,7 +283,8 @@ Status nå:
 
 - Kontorvisningen viser egen kø for `Ikke fakturert`.
 - Kontorbruker kan lage og dele CSV-basert fakturagrunnlag fra behandlede kontroller.
-- CSV-eksporten ligger i egen eksporthjelper og er dekket av en enkel enhetstest.
+- CSV-eksporten ligger i egen eksporthjelper og er dekket av en enhetstest.
+- Fakturagrunnlaget inkluderer sporingsfelt, eksportdato, statusdatoer, fakturastatus, vedlegg, maskiner, mangelantall, mangelpunkt og merknader.
 
 ## Milepæl 9: Test og pilotbruk
 
@@ -355,7 +356,7 @@ Status nå:
 - Hovedlisten varsler når en kontroll i kontorkøen mangler sertifikatnummer.
 - Detaljbildet viser egne `Teknikersjekk`- og `Kontorsjekk`-seksjoner med konkrete mangler.
 - Hovedlisten og `Kontorsjekk` viser antall sjekkpunkt som er merket med `Mangel`.
-- Fakturagrunnlag i CSV inkluderer `Antall mangler`.
+- Fakturagrunnlag i CSV inkluderer fakturastatus, statusdatoer, vedlegg, maskiner, mangelpunkt, `Antall mangler` og merknader.
 - Sertifikatgrunnlag kan lages og deles fra detaljbildet når kontorgrunnlaget er komplett.
 
 ## Anbefalt rekkefølge nå

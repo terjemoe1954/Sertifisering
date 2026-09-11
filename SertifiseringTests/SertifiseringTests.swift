@@ -278,7 +278,15 @@ struct SertifiseringTests {
     }
 
     @Test func billingCSVExporterBuildsOfficeInvoiceRows() async throws {
+        let inspectionID = try #require(UUID(uuidString: "11111111-2222-3333-4444-555555555555"))
+        let exportedAt = Date(timeIntervalSince1970: 1_800_100_000)
+        let createdAt = Date(timeIntervalSince1970: 1_799_800_000)
+        let updatedAt = Date(timeIntervalSince1970: 1_799_900_000)
+        let invoicedAt = Date(timeIntervalSince1970: 1_800_000_000)
         let inspection = Inspection(
+            id: inspectionID,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
             certificateNumber: "S-2026-001",
             companyOwner: "Kunde \"Nord\"; AS",
             contactPerson: "Ola Nordmann",
@@ -287,22 +295,45 @@ struct SertifiseringTests {
             inspector: "Tekniker Test",
             location: "Verksted A",
             projectNumber: "P-1001",
+            overallNotes: "Avklar pris; \"ekstra\" arbeid",
+            attachmentsCount: "3",
             status: .approvedWithRemarks,
-            workflowStatus: .processedByOffice
+            workflowStatus: .invoiced
         )
-        let machine = Machine(name: "Traverskran", machineType: "Kran", serialNumber: "KR-42")
-        machine.checklistItems = [
-            MachineChecklistItem(sectionOrder: 1, sectionTitle: "Seksjon", itemOrder: 1, code: "1.1", title: "Kontrollpunkt", result: .remark)
+        inspection.invoicedAt = invoicedAt
+        let crane = Machine(name: "Traverskran", machineType: "Kran", serialNumber: "KR-42")
+        crane.checklistItems = [
+            MachineChecklistItem(sectionOrder: 1, sectionTitle: "Seksjon", itemOrder: 1, code: "1.1", title: "Kontrollpunkt", result: .remark),
+            MachineChecklistItem(sectionOrder: 1, sectionTitle: "Seksjon", itemOrder: 2, code: "1.2", title: "OK-punkt", result: .ok)
         ]
-        inspection.machines = [machine]
+        let hoist = Machine(name: "A-lofter", machineType: "Talje", serialNumber: "AL-1")
+        hoist.checklistItems = [
+            MachineChecklistItem(sectionOrder: 2, sectionTitle: "Seksjon", itemOrder: 1, code: "2.1", title: "Taljemangel", result: .remark)
+        ]
+        inspection.machines = [crane, hoist]
 
-        let csv = BillingCSVExporter.makeCSV(inspections: [inspection])
+        let csv = BillingCSVExporter.makeCSV(inspections: [inspection], exportedAt: exportedAt)
+        let exportedURL = try BillingCSVExporter.export(inspections: [inspection], exportedAt: exportedAt)
+        let exportedData = try Data(contentsOf: exportedURL)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .short
+        dateFormatter.timeStyle = .short
+        dateFormatter.locale = Locale(identifier: "nb_NO")
+        let expectedExportedDate = dateFormatter.string(from: exportedAt)
+        let expectedCreatedDate = dateFormatter.string(from: createdAt)
+        let expectedUpdatedDate = dateFormatter.string(from: updatedAt)
+        let expectedInvoicedDate = dateFormatter.string(from: invoicedAt)
 
-        #expect(csv.contains("\"Kunde\";\"Kontaktperson\";\"Telefon\""))
-        #expect(csv.contains("\"Antall maskiner\";\"Antall mangler\";\"Maskiner\""))
-        #expect(csv.contains("\"Kunde \"\"Nord\"\"; AS\""))
-        #expect(csv.contains("\"Godkjent med mangel\";\"Behandlet av kontor\""))
-        #expect(csv.contains("\"1\";\"1\";\"Traverskran Kran KR-42\""))
+        #expect(exportedURL.lastPathComponent.hasPrefix("fakturagrunnlag-"))
+        #expect(exportedURL.lastPathComponent.hasSuffix(".csv"))
+        #expect(exportedData.starts(with: [0xEF, 0xBB, 0xBF]))
+        #expect(csv.contains("\r\n\"11111111-2222-3333-4444-555555555555\""))
+        #expect(csv.contains("\"Kontroll-ID\";\"Eksportert\";\"Opprettet\";\"Sist endret\";\"Kunde\""))
+        #expect(csv.contains("\"11111111-2222-3333-4444-555555555555\";\"\(expectedExportedDate)\";\"\(expectedCreatedDate)\";\"\(expectedUpdatedDate)\";\"Kunde \"\"Nord\"\"; AS\""))
+        #expect(csv.contains("\"Arbeidsstatus\";\"Fakturastatus\";\"Fullført\";\"Behandlet\";\"Fakturert\""))
+        #expect(csv.contains("\"Antall vedlegg\";\"Antall maskiner\";\"Antall mangler\";\"Mangelpunkter\";\"Maskiner\";\"Merknader\""))
+        #expect(csv.contains("\"Godkjent med mangel\";\"Fakturert\";\"Fakturert\""))
+        #expect(csv.contains("\"\(expectedInvoicedDate)\";\"3\";\"2\";\"2\";\"A-lofter: 2.1 Taljemangel | Traverskran: 1.1 Kontrollpunkt\";\"A-lofter Talje AL-1 | Traverskran Kran KR-42\";\"Avklar pris; \"\"ekstra\"\" arbeid\""))
     }
 
     @Test func certificateBasisExporterBuildsOfficeSummary() async throws {
