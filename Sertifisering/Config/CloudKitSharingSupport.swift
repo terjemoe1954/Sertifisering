@@ -4,6 +4,7 @@ import UIKit
 enum CloudKitSharingSupport {
     private static let companyShareZoneName = "CompanyData"
     private static let companyRootRecordName = "company-dataset"
+    private static let modifyRecordsBatchLimit = 400
     static let shareAcceptanceMessageDefaultsKey = "cloudkit.share.acceptance.message"
 
     struct UploadSummary {
@@ -111,17 +112,14 @@ enum CloudKitSharingSupport {
                 }
 
                 let records = makeCompanyRecords(rootRecord: rootRecord, inspections: inspections, zoneID: zoneID)
-                let operation = CKModifyRecordsOperation(recordsToSave: records, recordIDsToDelete: nil)
-                operation.savePolicy = .allKeys
-                operation.modifyRecordsResultBlock = { result in
+                saveRecordsInBatches(records, database: database) { result in
                     switch result {
-                    case .success:
-                        completion(.success(UploadSummary(recordCount: records.count, targetDescription: "privat firmadatasone")))
+                    case .success(let recordCount):
+                        completion(.success(UploadSummary(recordCount: recordCount, targetDescription: "privat firmadatasone")))
                     case .failure(let error):
                         completion(.failure(error))
                     }
                 }
-                database.add(operation)
             }
         }
     }
@@ -142,18 +140,45 @@ enum CloudKitSharingSupport {
                     inspections: inspections,
                     zoneID: rootRecord.recordID.zoneID
                 )
-                let operation = CKModifyRecordsOperation(recordsToSave: records, recordIDsToDelete: nil)
-                operation.savePolicy = .allKeys
-                operation.modifyRecordsResultBlock = { result in
+                saveRecordsInBatches(records, database: database) { result in
                     switch result {
-                    case .success:
-                        completion(.success(UploadSummary(recordCount: records.count, targetDescription: "delt firmadatasone")))
+                    case .success(let recordCount):
+                        completion(.success(UploadSummary(recordCount: recordCount, targetDescription: "delt firmadatasone")))
                     case .failure(let error):
                         completion(.failure(error))
                     }
                 }
-                database.add(operation)
             }
+        }
+    }
+
+    static func deletePrivateCompanyData(
+        completion: @escaping (Result<String, Error>) -> Void
+    ) {
+        let database = container.privateCloudDatabase
+        let zoneID = CKRecordZone.ID(zoneName: companyShareZoneName, ownerName: CKCurrentUserDefaultName)
+
+        database.fetch(withRecordZoneID: zoneID) { _, fetchError in
+            if let fetchError {
+                if let ckError = fetchError as? CKError, ckError.code == .zoneNotFound || ckError.code == .unknownItem {
+                    completion(.success("Ingen private iCloud-testdata funnet."))
+                    return
+                }
+
+                completion(.failure(fetchError))
+                return
+            }
+
+            let operation = CKModifyRecordZonesOperation(recordZonesToSave: nil, recordZoneIDsToDelete: [zoneID])
+            operation.modifyRecordZonesResultBlock = { result in
+                switch result {
+                case .success:
+                    completion(.success("Private iCloud-testdata er slettet for denne Apple ID-en."))
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+            }
+            database.add(operation)
         }
     }
 
@@ -344,6 +369,75 @@ enum CloudKitSharingSupport {
             record["title"] = "Sertifisering firmadata" as CKRecordValue
             record["createdAt"] = Date() as CKRecordValue
             completion(record, nil)
+        }
+    }
+
+    static func cloudKitModifyBatchSizes(recordCount: Int) -> [Int] {
+        guard recordCount > 0 else {
+            return []
+        }
+
+        var sizes: [Int] = []
+        var remainingCount = recordCount
+
+        while remainingCount > 0 {
+            let batchSize = min(modifyRecordsBatchLimit, remainingCount)
+            sizes.append(batchSize)
+            remainingCount -= batchSize
+        }
+
+        return sizes
+    }
+
+    private static func saveRecordsInBatches(
+        _ records: [CKRecord],
+        database: CKDatabase,
+        completion: @escaping (Result<Int, Error>) -> Void
+    ) {
+        let batches = recordBatches(from: records)
+        saveRecordBatch(at: 0, batches: batches, database: database, savedCount: 0, completion: completion)
+    }
+
+    private static func saveRecordBatch(
+        at index: Int,
+        batches: [[CKRecord]],
+        database: CKDatabase,
+        savedCount: Int,
+        completion: @escaping (Result<Int, Error>) -> Void
+    ) {
+        guard index < batches.count else {
+            completion(.success(savedCount))
+            return
+        }
+
+        let batch = batches[index]
+        let operation = CKModifyRecordsOperation(recordsToSave: batch, recordIDsToDelete: nil)
+        operation.savePolicy = .allKeys
+        operation.modifyRecordsResultBlock = { result in
+            switch result {
+            case .success:
+                saveRecordBatch(
+                    at: index + 1,
+                    batches: batches,
+                    database: database,
+                    savedCount: savedCount + batch.count,
+                    completion: completion
+                )
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+        database.add(operation)
+    }
+
+    private static func recordBatches(from records: [CKRecord]) -> [[CKRecord]] {
+        var startIndex = records.startIndex
+
+        return cloudKitModifyBatchSizes(recordCount: records.count).map { batchSize in
+            let endIndex = records.index(startIndex, offsetBy: batchSize)
+            let batch = Array(records[startIndex..<endIndex])
+            startIndex = endIndex
+            return batch
         }
     }
 

@@ -28,6 +28,14 @@ struct SertifiseringTests {
         #expect(PersistenceController.isCloudKitEnabledInSettings == false)
     }
 
+    @Test func cloudKitUploadSplitsLargeRecordBatches() async throws {
+        #expect(CloudKitSharingSupport.cloudKitModifyBatchSizes(recordCount: 0) == [])
+        #expect(CloudKitSharingSupport.cloudKitModifyBatchSizes(recordCount: 399) == [399])
+        #expect(CloudKitSharingSupport.cloudKitModifyBatchSizes(recordCount: 400) == [400])
+        #expect(CloudKitSharingSupport.cloudKitModifyBatchSizes(recordCount: 490) == [400, 90])
+        #expect(CloudKitSharingSupport.cloudKitModifyBatchSizes(recordCount: 801) == [400, 400, 1])
+    }
+
     @Test func inMemoryModelContainerCanStoreInspection() async throws {
         let container = try PersistenceController.makeModelContainer(isStoredInMemoryOnly: true)
         let context = container.mainContext

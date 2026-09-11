@@ -66,10 +66,15 @@ struct SettingsView: View {
     @State private var cloudKitUploadMessage: String?
     @State private var cloudKitShareMessage: String?
     @State private var cloudKitDownloadMessage: String?
+    @State private var cloudKitDeleteMessage: String?
     @State private var cloudKitShareAcceptanceMessage: String?
     @State private var isUploadingCompanyData = false
     @State private var isPreparingCompanyShare = false
     @State private var isDownloadingCompanyData = false
+    @State private var isDeletingPrivateCloudData = false
+    @State private var isConfirmingPrivateCloudDelete = false
+    @State private var isConfirmingDeleteAllInspections = false
+    @State private var deleteAllInspectionsMessage: String?
     @State private var preparedCompanyShare: CKShare?
     @State private var backupToRestore: PersistenceController.BackupSnapshot?
     @State private var isShowingHelpGuide = false
@@ -202,6 +207,28 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
 
+                    Button("Slett private iCloud-testdata", systemImage: "trash", role: .destructive) {
+                        isConfirmingPrivateCloudDelete = true
+                    }
+                    .disabled(!PersistenceController.isCloudKitPrepared || isDeletingPrivateCloudData)
+
+                    if let cloudKitDeleteMessage {
+                        Text(cloudKitDeleteMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Button("Slett alle kontroller i appen", systemImage: "trash.circle", role: .destructive) {
+                        isConfirmingDeleteAllInspections = true
+                    }
+                    .disabled(inspections.isEmpty)
+
+                    if let deleteAllInspectionsMessage {
+                        Text(deleteAllInspectionsMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
                     Text("Deling krever at mottakeren har egen Apple ID med iCloud aktivert.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -279,6 +306,30 @@ struct SettingsView: View {
                         dismiss()
                     }
                 }
+            }
+            .confirmationDialog(
+                "Slett alle kontroller?",
+                isPresented: $isConfirmingDeleteAllInspections,
+                titleVisibility: .visible
+            ) {
+                Button("Slett alle kontroller", role: .destructive) {
+                    deleteAllInspections()
+                }
+                Button("Avbryt", role: .cancel) { }
+            } message: {
+                Text("Dette sletter alle kontroller i appens aktive lagring. Hvis iCloud-lagring er aktiv, kan slettingen synkes til iCloud for denne Apple ID-en.")
+            }
+            .confirmationDialog(
+                "Slett private iCloud-testdata?",
+                isPresented: $isConfirmingPrivateCloudDelete,
+                titleVisibility: .visible
+            ) {
+                Button("Slett private iCloud-testdata", role: .destructive) {
+                    deletePrivateCloudData()
+                }
+                Button("Avbryt", role: .cancel) { }
+            } message: {
+                Text("Dette sletter firmadata i privat CloudKit-sone for Apple ID-en som er innlogget på denne enheten. Lokale kontroller på enheten slettes ikke automatisk.")
             }
             .confirmationDialog(
                 "Planlegg gjenoppretting",
@@ -403,6 +454,39 @@ struct SettingsView: View {
                     isShowingCompanySharing = true
                 case .failure(let error):
                     cloudKitShareMessage = "Kunne ikke åpne deling: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    private func deleteAllInspections() {
+        let count = inspections.count
+
+        for inspection in inspections {
+            modelContext.delete(inspection)
+        }
+
+        do {
+            try modelContext.save()
+            deleteAllInspectionsMessage = "Slettet \(count) kontroller fra appens aktive lagring. Hold appen åpen litt hvis iCloud skal synke slettingen."
+        } catch {
+            deleteAllInspectionsMessage = "Kunne ikke slette kontroller: \(error.localizedDescription)"
+        }
+    }
+
+    private func deletePrivateCloudData() {
+        isDeletingPrivateCloudData = true
+        cloudKitDeleteMessage = "Sletter private iCloud-testdata..."
+
+        CloudKitSharingSupport.deletePrivateCompanyData { result in
+            Task { @MainActor in
+                isDeletingPrivateCloudData = false
+
+                switch result {
+                case .success(let message):
+                    cloudKitDeleteMessage = "\(message) Slett appen eller lokale kontroller før du henter på nytt hvis du vil starte helt blankt."
+                case .failure(let error):
+                    cloudKitDeleteMessage = "Kunne ikke slette private iCloud-testdata: \(error.localizedDescription)"
                 }
             }
         }
