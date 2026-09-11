@@ -398,6 +398,8 @@ struct SertifiseringTests {
         machine.name = "Traverskran test"
         machine.machineType = "Kran"
         machine.serialNumber = "PDF-42"
+        machine.checklistItems?.first?.result = .remark
+        machine.checklistItems?.first?.note = "Dette er en lengre merknad som skal få bedre plass i rapporten og brytes over flere linjer uten at resten av tabellen blir unødvendig bred."
         inspection.machines = [machine]
 
         let url = try InspectionPDFExporter.export(inspection: inspection)

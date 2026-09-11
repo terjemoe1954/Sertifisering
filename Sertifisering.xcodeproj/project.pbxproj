@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A83888843053C8B700F0578A /* Brukerveiledning_Ny_Bruker.md in Resources */ = {isa = PBXBuildFile; fileRef = A83888833053C8B700F0578A /* Brukerveiledning_Ny_Bruker.md */; };
 		A8B8E82C304EB9F900F118FB /* MILESTONES.md in Resources */ = {isa = PBXBuildFile; fileRef = A8B8E82B304EB9F900F118FB /* MILESTONES.md */; };
 /* End PBXBuildFile section */
 
@@ -28,6 +29,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A83888833053C8B700F0578A /* Brukerveiledning_Ny_Bruker.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Brukerveiledning_Ny_Bruker.md; sourceTree = "<group>"; };
 		A8B8E82B304EB9F900F118FB /* MILESTONES.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = MILESTONES.md; sourceTree = "<group>"; };
 		A8BE96FF30495BC300B2D06B /* Sertifisering.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Sertifisering.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A8BE970C30495BC500B2D06B /* SertifiseringTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SertifiseringTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -98,6 +100,7 @@
 				A8BE971930495BC500B2D06B /* SertifiseringUITests */,
 				A8BE970030495BC300B2D06B /* Products */,
 				A8B8E82B304EB9F900F118FB /* MILESTONES.md */,
+				A83888833053C8B700F0578A /* Brukerveiledning_Ny_Bruker.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -232,6 +235,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A8B8E82C304EB9F900F118FB /* MILESTONES.md in Resources */,
+				A83888843053C8B700F0578A /* Brukerveiledning_Ny_Bruker.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

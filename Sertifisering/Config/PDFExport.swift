@@ -127,7 +127,7 @@ enum InspectionPDFExporter {
         drawLabeledField(label: "Dato", value: formattedDate(inspection.createdAt), rect: CGRect(x: margin + width * 0.62, y: y + 58, width: width * 0.34, height: 18), labelWidth: 30, labelAttributes: headingAttributes, valueAttributes: bodyAttributes)
         y += 102
 
-        drawOuterBox(CGRect(x: margin, y: y, width: width, height: 208))
+        drawOuterBox(CGRect(x: margin, y: y, width: width, height: 211))
         drawCategoryRow(category: machine.category, annualControl: machine.annualControl, fullService: machine.fullService, origin: CGPoint(x: margin + 10, y: y + 10), width: width - 20)
         drawLabeledField(label: "Maskintype", value: machine.machineType, rect: CGRect(x: margin + 10, y: y + 86, width: width * 0.48, height: 18), labelWidth: 60, labelAttributes: headingAttributes, valueAttributes: bodyAttributes)
         drawLabeledField(label: "Produsent", value: machine.manufacturer, rect: CGRect(x: margin + width * 0.52, y: y + 86, width: width * 0.44 - 10, height: 18), labelWidth: 60, labelAttributes: headingAttributes, valueAttributes: bodyAttributes)
@@ -140,7 +140,7 @@ enum InspectionPDFExporter {
         drawLabeledField(label: "Lastangivelse", value: machine.loadIndicator, rect: CGRect(x: margin + width * 0.52, y: y + 164, width: width * 0.44 - 10, height: 18), labelWidth: 74, labelAttributes: headingAttributes, valueAttributes: bodyAttributes)
         drawLabeledField(label: "Evt. sert. nr", value: machine.certificateNumber, rect: CGRect(x: margin + 10, y: y + 190, width: width * 0.48, height: 18), labelWidth: 62, labelAttributes: headingAttributes, valueAttributes: bodyAttributes)
         drawLabeledField(label: "SWP", value: machine.remainingLifetimeSWP, rect: CGRect(x: margin + width * 0.52, y: y + 190, width: width * 0.44 - 10, height: 18), labelWidth: 34, labelAttributes: headingAttributes, valueAttributes: bodyAttributes)
-        y += 220
+        y += 223
 
         drawSectionHeader("Kontrollpunkter", y: y, margin: margin, width: width)
         y += 24
@@ -297,30 +297,34 @@ enum InspectionPDFExporter {
                 y = margin
             }
 
+            y += checklistSectionTopOffset(for: group.0)
             drawSectionHeader(group.0, y: y, margin: margin, width: width)
             y += 22
             drawChecklistTableHeader(y: y, margin: margin, width: width)
             y += 20
 
             for item in group.1 {
-                if y > pageRect.height - 70 {
+                let noteWidth = checklistNoteWidth(totalWidth: width)
+                let rowHeight = checklistRowHeight(for: item.note, noteWidth: noteWidth, attributes: bodyAttributes)
+
+                if y + rowHeight > pageRect.height - margin {
                     context.beginPage()
-                    y = margin
+                    y = margin + checklistSectionTopOffset(for: group.0)
                     drawSectionHeader(group.0, y: y, margin: margin, width: width)
                     y += 22
                     drawChecklistTableHeader(y: y, margin: margin, width: width)
                     y += 20
                 }
 
-                let rowRect = CGRect(x: margin, y: y, width: width, height: 26)
+                let rowRect = CGRect(x: margin, y: y, width: width, height: rowHeight)
                 drawInnerBox(rowRect)
-                drawText(item.code, in: CGRect(x: margin + 6, y: y + 6, width: 32, height: 14), attributes: bodyAttributes)
-                drawText(item.title, in: CGRect(x: margin + 42, y: y + 4, width: 250, height: 18), attributes: bodyAttributes)
-                drawChecklistMark(for: item.result, expected: .ok, rect: CGRect(x: margin + 300, y: y + 5, width: 14, height: 14))
-                drawChecklistMark(for: item.result, expected: .remark, rect: CGRect(x: margin + 340, y: y + 5, width: 14, height: 14))
-                drawChecklistMark(for: item.result, expected: .notApplicable, rect: CGRect(x: margin + 380, y: y + 5, width: 14, height: 14))
-                drawText(item.note.isEmpty ? "-" : item.note, in: CGRect(x: margin + 410, y: y + 4, width: width - 420, height: 18), attributes: bodyAttributes)
-                y += 28
+                drawText(item.code, in: CGRect(x: margin + 6, y: y + 6, width: 30, height: 14), attributes: bodyAttributes)
+                drawMultilineText(item.title, in: CGRect(x: margin + 40, y: y + 5, width: 190, height: rowHeight - 10), attributes: bodyAttributes)
+                drawChecklistMark(for: item.result, expected: .ok, rect: CGRect(x: margin + 238, y: y + 6, width: 12, height: 12))
+                drawChecklistMark(for: item.result, expected: .remark, rect: CGRect(x: margin + 268, y: y + 6, width: 12, height: 12))
+                drawChecklistMark(for: item.result, expected: .notApplicable, rect: CGRect(x: margin + 298, y: y + 6, width: 12, height: 12))
+                drawMultilineText(item.note.isEmpty ? "-" : item.note, in: CGRect(x: margin + 324, y: y + 5, width: noteWidth, height: rowHeight - 10), attributes: bodyAttributes)
+                y += rowHeight + 2
             }
 
             y += 8
@@ -329,16 +333,39 @@ enum InspectionPDFExporter {
         return y
     }
 
+    private static func checklistSectionTopOffset(for sectionTitle: String) -> CGFloat {
+        sectionTitle.contains("ELEKTRISK ANLEGG") ? 6 : 0
+    }
+
+    private static func checklistNoteWidth(totalWidth: CGFloat) -> CGFloat {
+        max(totalWidth - 334, 180)
+    }
+
+    private static func checklistRowHeight(
+        for note: String,
+        noteWidth: CGFloat,
+        attributes: [NSAttributedString.Key: Any]
+    ) -> CGFloat {
+        let value = note.isEmpty ? "-" : note
+        let measuredHeight = (value as NSString).boundingRect(
+            with: CGSize(width: noteWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes,
+            context: nil
+        ).height
+        return max(26, ceil(measuredHeight) + 14)
+    }
+
     private static func drawChecklistTableHeader(y: CGFloat, margin: CGFloat, width: CGFloat) {
         let headerRect = CGRect(x: margin, y: y, width: width, height: 18)
         UIColor.systemGray6.setFill()
         UIBezierPath(rect: headerRect).fill()
-        drawText("Pkt", in: CGRect(x: margin + 6, y: y + 2, width: 28, height: 14), attributes: textStyle(size: 10, weight: .bold))
-        drawText("Beskrivelse", in: CGRect(x: margin + 42, y: y + 2, width: 120, height: 14), attributes: textStyle(size: 10, weight: .bold))
-        drawText("OK", in: CGRect(x: margin + 296, y: y + 2, width: 24, height: 14), attributes: textStyle(size: 10, weight: .bold))
-        drawText("M", in: CGRect(x: margin + 338, y: y + 2, width: 20, height: 14), attributes: textStyle(size: 10, weight: .bold))
-        drawText("IR", in: CGRect(x: margin + 376, y: y + 2, width: 20, height: 14), attributes: textStyle(size: 10, weight: .bold))
-        drawText("Merknad", in: CGRect(x: margin + 410, y: y + 2, width: width - 420, height: 14), attributes: textStyle(size: 10, weight: .bold))
+        drawText("Pkt", in: CGRect(x: margin + 6, y: y + 2, width: 28, height: 14), attributes: textStyle(size: 9, weight: .bold))
+        drawText("Beskrivelse", in: CGRect(x: margin + 40, y: y + 2, width: 120, height: 14), attributes: textStyle(size: 9, weight: .bold))
+        drawText("OK", in: CGRect(x: margin + 234, y: y + 2, width: 24, height: 14), attributes: textStyle(size: 9, weight: .bold))
+        drawText("M", in: CGRect(x: margin + 266, y: y + 2, width: 20, height: 14), attributes: textStyle(size: 9, weight: .bold))
+        drawText("IR", in: CGRect(x: margin + 294, y: y + 2, width: 20, height: 14), attributes: textStyle(size: 9, weight: .bold))
+        drawText("Merknad", in: CGRect(x: margin + 324, y: y + 2, width: checklistNoteWidth(totalWidth: width), height: 14), attributes: textStyle(size: 9, weight: .bold))
     }
 
     private static func drawChecklistMark(for actual: ChecklistResult, expected: ChecklistResult, rect: CGRect) {
